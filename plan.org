@@ -1,0 +1,23 @@
+Goal:
+      Be able to execute a command like ~mk path/to/file.hs~
+
+Function:
+      1. ~mkdir -p "path/to/"~
+      2. ~vim -ec "wq" -- "path/to/file.hs"~
+
+However, I'm going to implement the templating engine in Haskell instead of calling vim in the background (should be way faster -- vim takes a second to load).
+
+As variable dispatcher use a ~Map String (Path -> String)~.
+Or rather, ~Map String (Path -> IO String)~, since we might need to call external commands.
+
+* Plan
+** Re-use the format from vim-template
+** Add command-line option for template directory (can be passed multiple times, will be searched in order)
+** Include my custom variables (now implemented in vimscript) directly into this program
+** Look at how vim-template is implemented w.r.t. vim-hooks, and integrate this program into vim instead
+** Integrate into emacs
+** Later: maybe also allow templating of full project structure (like ~stack new~)
+*** This might require a separate command-line argument "template", since I can't just match the file extension
+** Also make shell aliases like ~mkm~ and ~mke~ which create the file and open it with ~m~ or ~e~ afterwards
+** Add command-line argument ~--var-command VAR CMD~ to add custom variables (~%VAR%~ will be evaluated as ~$CMD "path/to/file.hs"~)
+** Post it on the vim-template github page when done? maybe someone else there is interested in a standalone implementation.
