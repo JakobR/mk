@@ -62,6 +62,7 @@ renderTemplate evals target (Template chunks) = do
   renderedChunks <- traverse (renderChunk evals target) chunks
   let Pair b cs = combineRenderedChunks renderedChunks
   pure $ (toLazyByteString (blBuilder b), cs)
+{-# INLINABLE renderTemplate #-}
 
 
 data RenderedChunk

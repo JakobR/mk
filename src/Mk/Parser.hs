@@ -10,7 +10,6 @@ module Mk.Parser
 -- base
 import Data.Maybe (fromMaybe)
 import Data.Void (Void)
-import Data.Word (Word8)
 
 -- bytestring
 import Data.ByteString (ByteString)
@@ -59,6 +58,7 @@ parseTemplate' pos str =
   case parse (setPosition pos *> templateP <* eof) "" str of
     Left err -> throwError $ errorBundlePretty err
     Right x -> return x
+{-# INLINABLE parseTemplate' #-}
 
 parseTemplate
   :: MonadError String m
@@ -67,3 +67,4 @@ parseTemplate
   -> m Template
 parseTemplate srcName =
   parseTemplate' (initialPos $ fromMaybe "<string>" srcName)
+{-# INLINABLE parseTemplate #-}

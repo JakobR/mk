@@ -12,7 +12,6 @@ import System.Exit
 import System.IO
 
 -- bytestring
--- import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 
@@ -48,7 +47,9 @@ main = do
   when optVerbose $ hPrint stderr opts
 
   result <- runReaderT (runExceptT main') opts
-  either (die . ("Error: "++)) pure result
+  case result of
+    Left err -> die $ "Error: " ++ err
+    Right x -> pure x
 
 
 main' :: (MonadReader Options m, MonadError String m, MonadIO m) => m ()

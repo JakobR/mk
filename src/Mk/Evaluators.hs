@@ -34,6 +34,8 @@ allEvaluators = Map.fromList
   [ (Var "HASKELLRESOLVER", testEvaluator)
   , (Var "HASKELLMODULE", testEvaluator)
   ]
+{-# INLINABLE allEvaluators #-}
+
 
 testEvaluator :: (MonadError String m, MonadIO m) => Var -> Path Abs File -> m ByteString
 testEvaluator var _ = do
