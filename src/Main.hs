@@ -8,7 +8,6 @@ module Main
 -- base
 import Control.Monad.IO.Class
 import Data.List
-import Data.Maybe
 import System.Exit
 import System.IO
 
@@ -33,6 +32,9 @@ import Path
 
 -- path-io
 import qualified Path.IO
+
+-- transformers
+import Control.Monad.Trans.Maybe
 
 -- mk
 import Options
@@ -103,12 +105,13 @@ getTemplate = do
 
 findTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
 findTemplate = do
-  Options{..} <- ask
-  when (null optTemplateSearchDirs) $
+  dirs <- asks optTemplateSearchDirs
+
+  when (null dirs) $
     throwError "Error: no template search paths"
 
   matchingTemplates <-
-    traverseUntilFirstJust findTemplateInDir optTemplateSearchDirs
+    runMaybeT $ msum (MaybeT . findTemplateInDir <$> dirs)
 
   case matchingTemplates of
     Just t -> pure t
@@ -118,14 +121,7 @@ findTemplate = do
 -- | Same result as @headMay . catMaybes <$> traverse f xs@,
 -- but only executes the monadic actions until the first @Just@ is found.
 traverseUntilFirstJust :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
-traverseUntilFirstJust f = go
-  where
-    go [] = pure Nothing
-    go (x:xs) = do
-      mb <- f x
-      case mb of
-        Just _ -> pure mb
-        Nothing -> go xs
+traverseUntilFirstJust f xs = runMaybeT $ msum (MaybeT . f <$> xs)
 
 
 findTemplateInDir
