@@ -29,6 +29,7 @@ executable mk
                   , bytestring
                   , containers
                   , megaparsec
+                  , mtl
                   , optparse-applicative
                   , path
                   , path-io

@@ -23,6 +23,7 @@ data Options' dir file = Options
   , optTemplate :: Maybe file
   -- , oprVarCommands :: [ TODO ]
   , optForce :: Bool
+  , optVerbose :: Bool
   , optTarget :: file
   }
   deriving Show
@@ -37,6 +38,7 @@ optionsParser =
   <*> many templateSearchDir
   <*> optional template
   <*> forceFlag
+  <*> verboseFlag
   <*> target
 
   where
@@ -69,6 +71,12 @@ optionsParser =
       <> long "force"
       <> help "Force overwriting if target file already exists"
 
+    verboseFlag =
+      switch $
+      short 'v'
+      <> long "verbose"
+      <> help "More output"
+
 
 optionsParserInfo :: ParserInfo OptionsUnresolved
 optionsParserInfo =
@@ -82,21 +90,22 @@ resolveOptions
   :: MonadIO m
   => OptionsUnresolved
   -> m Options
-resolveOptions ou = do
+resolveOptions o = do
 
   resolvedTarget <-
-    resolveFile' (optTarget ou)
+    resolveFile' (optTarget o)
 
   resolvedTemplateSearchDirs <-
-    traverse resolveDir' (optTemplateSearchDirs ou)
+    traverse resolveDir' (optTemplateSearchDirs o)
 
   resolvedTemplate <-
-    traverse resolveFile' (optTemplate ou)
+    traverse resolveFile' (optTemplate o)
 
   return Options{ optTarget = resolvedTarget
                 , optTemplateSearchDirs = resolvedTemplateSearchDirs
                 , optTemplate = resolvedTemplate
-                , optForce = optForce ou
+                , optForce = optForce o
+                , optVerbose = optVerbose o
                 }
 
 
