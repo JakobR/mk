@@ -118,12 +118,6 @@ findTemplate = do
     Nothing -> throwError "Error: no matching template found"
 
 
--- | Same result as @headMay . catMaybes <$> traverse f xs@,
--- but only executes the monadic actions until the first @Just@ is found.
-traverseUntilFirstJust :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
-traverseUntilFirstJust f xs = runMaybeT $ msum (MaybeT . f <$> xs)
-
-
 findTemplateInDir
   :: (MonadReader Options m, MonadError String m, MonadIO m)
   => Path Abs Dir
