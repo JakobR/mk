@@ -7,34 +7,20 @@ module Main
 
 -- base
 import Control.Monad.IO.Class
-import Data.Char (chr, isAlphaNum, ord)
 import Data.List (isPrefixOf)
-import Data.Maybe (fromMaybe)
-import Data.Void (Void)
-import Data.Word (Word8)
 import System.Exit
 import System.IO
 
 -- bytestring
-import Data.ByteString (ByteString)
+-- import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
-
--- containers
--- import Data.Map.Strict (Map)
-
--- conversion
-import Conversion (convert)
+-- import qualified Data.ByteString.Lazy as BL
 
 -- extra
 import Data.List.Extra (replace)
 
 -- Glob
 import qualified System.FilePath.Glob as Glob
-
--- megaparsec
-import Text.Megaparsec
--- import Text.Megaparsec.Byte
--- import Text.Megaparsec.Byte.Lexer
 
 -- mtl
 import Control.Monad.Except
@@ -50,77 +36,10 @@ import qualified Path.IO
 import Control.Monad.Trans.Maybe
 
 -- mk
-import Options
-
-
-newtype Var = Var { unVar :: ByteString }
-  deriving Show
-
-data Chunk
-  = ChunkVerbatim !ByteString
-  | ChunkVar !Var
-  deriving Show
-
-newtype Template = Template { unTemplate :: [Chunk] }
-  deriving Show
-
-
--- type VarEvaluator = Path Abs File -> IO ByteString
--- -- type VarMap = Map Var VarEvaluator
-
-
-type Parser = Parsec Void ByteString
-
-ord8 :: Char -> Word8
-ord8 c =
-  case convert (ord c) of
-    Just x -> x
-    Nothing -> error $ "cannot to convert Char " <> show c <> " to Word8"
-
-chr8 :: Word8 -> Char
-chr8 = chr . convert
-
-isAlphaNum8 :: Word8 -> Bool
-isAlphaNum8 = isAlphaNum . chr8
-
-varP :: Parser Var
-varP = do
-  void $ single (ord8 '%')
-  varName <- takeWhile1P (Just "alphanumeric character") isAlphaNum8
-  void $ single (ord8 '%')
-  return (Var varName)
-
-chunkP :: Parser Chunk
-chunkP = fmap ChunkVar varP
-         <|> fmap ChunkVerbatim verbatimP
-  where
-    verbatimP = takeWhile1P Nothing (/= ord8 '%')
-
-templateP :: Parser Template
-templateP = Template <$> many chunkP
-
-setPosition :: SourcePos -> Parser ()
-setPosition pos =
-  updateParserState $ \s -> s{statePosState = (statePosState s){ pstateSourcePos = pos }}
-
-parseTemplate'
-  :: MonadError String m
-  => SourcePos
-  -> ByteString
-  -> m Template
-parseTemplate' pos str =
-  case parse (setPosition pos *> templateP <* eof) "" str of
-    Left err -> throwError $ errorBundlePretty err
-    Right x -> return x
-
-parseTemplate
-  :: MonadError String m
-  => Maybe FilePath  -- ^ name of source file
-  -> ByteString      -- ^ text to parse
-  -> m Template
-parseTemplate srcName =
-  parseTemplate' (initialPos $ fromMaybe "<string>" srcName)
-
+import Mk.Evaluators
+import Mk.Options
+import Mk.Parser
+import Mk.Template
 
 
 main :: IO ()
@@ -151,11 +70,20 @@ main' = do
     parseTemplate (Just $ toFilePath templatePath) templateRaw
   putVerbose $ "Parsed template: " <> show template
 
+
+  renderedTemplate <- do
+    target <- asks optTarget
+    renderTemplate allEvaluators target template
+  putVerbose $ "Rendered template: " <> show renderedTemplate
+
   error "TODO"
   -- TODO
   -- Evaluate variables
   -- Write new file
   -- TODO: Check if new file already exists, only overwrite if given flag "-f/--force"
+  -- TODO: we need special handling for variable "%HERE%", since it's not to be replaced but
+  --       marks the cursor position.
+  --       Maybe add a new "ChunkCursor" to Chunk?
 
 
 whenVerbose :: MonadReader Options m => m () -> m ()

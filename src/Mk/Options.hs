@@ -1,4 +1,4 @@
-module Options
+module Mk.Options
   ( Options'(..)
   , Options
   , execOptionsParser
