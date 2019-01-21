@@ -14,7 +14,7 @@ import System.IO
 -- bytestring
 -- import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
--- import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as ByteString.Lazy
 
 -- extra
 import Data.List.Extra (replace)
@@ -53,7 +53,8 @@ main = do
 
 main' :: (MonadReader Options m, MonadError String m, MonadIO m) => m ()
 main' = do
-  ask >>= printVerbose
+  opts@Options{..} <- ask
+  printVerbose opts
 
   whenVerbose $ liftIO $ do
     hSetBuffering stderr NoBuffering
@@ -70,20 +71,22 @@ main' = do
     parseTemplate (Just $ toFilePath templatePath) templateRaw
   putVerbose $ "Parsed template: " <> show template
 
-
+  -- Evaluate the variables in the template
   renderedTemplate <- do
-    target <- asks optTarget
-    renderTemplate allEvaluators target template
+    renderTemplate allEvaluators optTarget template
   putVerbose $ "Rendered template: " <> show renderedTemplate
 
-  error "TODO"
-  -- TODO
-  -- Evaluate variables
-  -- Write new file
-  -- TODO: Check if new file already exists, only overwrite if given flag "-f/--force"
+  -- Write target file
+  unless optForce $ do
+    targetExists <- Path.IO.doesFileExist optTarget
+    when targetExists $
+      throwError "Target file already exists. Pass the option --force to overwrite it anyways."
+  liftIO $ ByteString.Lazy.writeFile (toFilePath optTarget) renderedTemplate
+
   -- TODO: we need special handling for variable "%HERE%", since it's not to be replaced but
   --       marks the cursor position.
   --       Maybe add a new "ChunkCursor" to Chunk?
+  --       (Then output the cursor position on stdout. Add an option "-q/--quiet" to suppress this.)
 
 
 whenVerbose :: MonadReader Options m => m () -> m ()
