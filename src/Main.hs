@@ -107,15 +107,16 @@ findTemplate = do
   when (null optTemplateSearchDirs) $
     throwError "Error: no template search paths"
 
-  -- findTemplateInDirs optTemplateSearchDirs
   matchingTemplates <-
     traverseUntilFirstJust findTemplateInDir optTemplateSearchDirs
-  --   catMaybes <$> traverse findTemplateInDir optTemplateSearchDirs
 
   case matchingTemplates of
     Just t -> pure t
     Nothing -> throwError "Error: no matching template found"
 
+
+-- | Same result as @headMay . catMaybes <$> traverse f xs@,
+-- but only executes the monadic actions until the first @Just@ is found.
 traverseUntilFirstJust :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
 traverseUntilFirstJust f = go
   where
@@ -126,17 +127,6 @@ traverseUntilFirstJust f = go
         Just _ -> pure mb
         Nothing -> go xs
 
--- findTemplateInDirs
---   :: (MonadReader Options m, MonadError String m, MonadIO m)
---   => [Path Abs Dir]
---   -> m (Path Abs File)
--- findTemplateInDirs [] =
---     throwError "Error: no matching template found"
--- findTemplateInDirs (d:ds) = do
---   mTemplate <- findTemplateInDir d
---   case mTemplate of
---     Just t -> pure t
---     Nothing -> findTemplateInDirs ds
 
 findTemplateInDir
   :: (MonadReader Options m, MonadError String m, MonadIO m)
@@ -168,7 +158,6 @@ findTemplateInDir dir = do
 -- For compatibility with vim-template, the string `=template=` acts like `*`.
 matches
   :: (MonadReader Options m, MonadError String m, MonadIO m)
-  -- :: MonadError String m
   => Path Abs File  -- ^ target file path
   -> Path Abs File  -- ^ template file path
   -> m Bool
