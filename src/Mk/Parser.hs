@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Mk.Parser
   ( parseTemplate'
@@ -7,16 +8,12 @@ module Mk.Parser
 
 
 -- base
-import Data.Char (chr, isAlphaNum, ord)
 import Data.Maybe (fromMaybe)
 import Data.Void (Void)
 import Data.Word (Word8)
 
 -- bytestring
 import Data.ByteString (ByteString)
-
--- conversion
-import Conversion (convert)
 
 -- megaparsec
 import Text.Megaparsec
@@ -25,22 +22,11 @@ import Text.Megaparsec
 import Control.Monad.Except
 
 -- mk
+import Mk.Char8
 import Mk.Template
 
 
 type Parser = Parsec Void ByteString
-
-ord8 :: Char -> Word8
-ord8 c =
-  case convert (ord c) of
-    Just x -> x
-    Nothing -> error $ "cannot to convert Char " <> show c <> " to Word8"
-
-chr8 :: Word8 -> Char
-chr8 = chr . convert
-
-isAlphaNum8 :: Word8 -> Bool
-isAlphaNum8 = isAlphaNum . chr8
 
 varP :: Parser Var
 varP = do
@@ -50,9 +36,11 @@ varP = do
   return (Var varName)
 
 chunkP :: Parser Chunk
-chunkP = fmap ChunkVar varP
+chunkP = ChunkCursor <$ cursorP
+         <|> fmap ChunkVar varP
          <|> fmap ChunkVerbatim verbatimP
   where
+    cursorP = chunk "%HERE%"
     verbatimP = takeWhile1P Nothing (/= ord8 '%')
 
 templateP :: Parser Template

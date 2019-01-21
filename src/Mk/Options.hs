@@ -24,6 +24,7 @@ data Options' dir file = Options
   -- , oprVarCommands :: [ TODO ]
   , optForce :: Bool
   , optVerbose :: Bool
+  , optQuiet :: Bool
   , optTarget :: file
   }
   deriving Show
@@ -39,6 +40,7 @@ optionsParser =
   <*> optional template
   <*> forceFlag
   <*> verboseFlag
+  <*> quietFlag
   <*> target
 
   where
@@ -75,14 +77,20 @@ optionsParser =
       switch $
       short 'v'
       <> long "verbose"
-      <> help "More output"
+      <> help "More output on stderr"
+
+    quietFlag =
+      switch $
+      short 'q'
+      <> long "quiet"
+      <> help "Less output on stdout, in particular the cursor positions will not be printed."
 
 
 optionsParserInfo :: ParserInfo OptionsUnresolved
 optionsParserInfo =
   info (optionsParser <**> helper)
        (fullDesc
-        <> progDesc "Create new files from templates"
+        <> progDesc "Create files from templates"
         <> header "mk")
 
 
@@ -106,6 +114,7 @@ resolveOptions o = do
                 , optTemplate = resolvedTemplate
                 , optForce = optForce o
                 , optVerbose = optVerbose o
+                , optQuiet = optQuiet o
                 }
 
 

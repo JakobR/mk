@@ -72,9 +72,10 @@ main' = do
   putVerbose $ "Parsed template: " <> show template
 
   -- Evaluate the variables in the template
-  renderedTemplate <- do
+  (renderedTemplate, cursorPositions) <- do
     renderTemplate allEvaluators optTarget template
   putVerbose $ "Rendered template: " <> show renderedTemplate
+  putVerbose $ "Cursor positions: " <> show cursorPositions
 
   -- Write target file
   unless optForce $ do
@@ -83,10 +84,18 @@ main' = do
       throwError "Target file already exists. Pass the option --force to overwrite it anyways."
   liftIO $ ByteString.Lazy.writeFile (toFilePath optTarget) renderedTemplate
 
-  -- TODO: we need special handling for variable "%HERE%", since it's not to be replaced but
-  --       marks the cursor position.
-  --       Maybe add a new "ChunkCursor" to Chunk?
-  --       (Then output the cursor position on stdout. Add an option "-q/--quiet" to suppress this.)
+  unless optQuiet $
+    forM_ cursorPositions putCursorLn
+
+
+-- | Prints the given position in the format "<abs>:<row>:<col>".
+putCursorLn :: MonadIO m => Pos -> m ()
+putCursorLn Pos{..} = liftIO $ do
+  putStr (show posAbsolute)
+  putChar ':'
+  putStr (show posRow)
+  putChar ':'
+  putStrLn (show posCol)
 
 
 whenVerbose :: MonadReader Options m => m () -> m ()
