@@ -7,6 +7,7 @@ module Main
 
 -- base
 import Control.Monad.IO.Class
+import Data.List
 import Data.Maybe
 import System.Exit
 import System.IO
@@ -17,12 +18,21 @@ import System.IO
 -- containers
 -- import Data.Map.Strict (Map)
 
+-- extra
+import Data.List.Extra (replace)
+
+-- Glob
+import qualified System.FilePath.Glob as Glob
+
 -- mtl
 import Control.Monad.Except
 import Control.Monad.Reader
 
 -- path
 import Path
+
+-- path-io
+import qualified Path.IO
 
 -- mk
 import Options
@@ -97,20 +107,98 @@ findTemplate = do
   when (null optTemplateSearchDirs) $
     throwError "Error: no template search paths"
 
+  -- findTemplateInDirs optTemplateSearchDirs
   matchingTemplates <-
-    catMaybes <$> traverse findTemplateInDir optTemplateSearchDirs
+    traverseUntilFirstJust findTemplateInDir optTemplateSearchDirs
+  --   catMaybes <$> traverse findTemplateInDir optTemplateSearchDirs
 
   case matchingTemplates of
-    t:_ -> pure t
-    [] -> throwError "Error: no matching template found"
+    Just t -> pure t
+    Nothing -> throwError "Error: no matching template found"
 
+traverseUntilFirstJust :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+traverseUntilFirstJust f = go
+  where
+    go [] = pure Nothing
+    go (x:xs) = do
+      mb <- f x
+      case mb of
+        Just _ -> pure mb
+        Nothing -> go xs
+
+-- findTemplateInDirs
+--   :: (MonadReader Options m, MonadError String m, MonadIO m)
+--   => [Path Abs Dir]
+--   -> m (Path Abs File)
+-- findTemplateInDirs [] =
+--     throwError "Error: no matching template found"
+-- findTemplateInDirs (d:ds) = do
+--   mTemplate <- findTemplateInDir d
+--   case mTemplate of
+--     Just t -> pure t
+--     Nothing -> findTemplateInDirs ds
 
 findTemplateInDir
-  :: (MonadReader Options m, MonadIO m)
+  :: (MonadReader Options m, MonadError String m, MonadIO m)
   => Path Abs Dir
   -> m (Maybe (Path Abs File))
 findTemplateInDir dir = do
   putVerbose $ "Searching directory: " <> show dir
-  -- TODO: return an error if the match is ambigous (i.e., more than one file matches)
-  pure Nothing
-  -- error "TODO"
+
+  target <- asks optTarget
+  (_, files) <- Path.IO.listDir dir
+
+  let isHidden = ("." `isPrefixOf`) . toFilePath . filename
+      templates = filter (not . isHidden) files
+  putVerbose $ "Found templates: " <> show templates
+
+  matchingTemplates <-
+    filterM (target `matches`) templates
+  putVerbose $ "Matching templates: " <> show matchingTemplates
+
+  case matchingTemplates of
+    [] -> pure Nothing
+    [t] -> pure (Just t)
+    ts@(_:_) -> throwError $ "Error: ambiguous match: " <> show ts
+
+
+-- | Template file names are treated as glob-like patterns which target file name is matched against.
+-- At the moment, only basic wildcards (`*` and `?`) are enabled.
+--
+-- For compatibility with vim-template, the string `=template=` acts like `*`.
+matches
+  :: (MonadReader Options m, MonadError String m, MonadIO m)
+  -- :: MonadError String m
+  => Path Abs File  -- ^ target file path
+  -> Path Abs File  -- ^ template file path
+  -> m Bool
+matches target template = do
+  case Glob.tryCompileWith compOptions templateName' of
+    Left err ->
+      throwError $ "Error trying to match against " <> show template <> ": " <> err
+    Right templatePattern -> do
+      let result = Glob.matchWith matchOptions templatePattern targetName
+      putVerbose $ "Matching " <> show targetName <>
+        " against pattern " <> show templatePattern <> ": " <> show result
+      pure result
+
+  where
+    targetName = toFilePath (filename target)
+    templateName = toFilePath (filename template)
+    templateName' = replace "=template=" "*" templateName
+
+    compOptions =
+      Glob.CompOptions{ Glob.characterClasses = False
+                      , Glob.characterRanges = False
+                      , Glob.numberRanges = False
+                      , Glob.wildcards = True
+                      , Glob.recursiveWildcards = False
+                      , Glob.pathSepInRanges = False
+                      , Glob.errorRecovery = False
+                      }
+
+    matchOptions =
+      Glob.MatchOptions{ Glob.matchDotsImplicitly = True
+                       , Glob.ignoreCase = False
+                       , Glob.ignoreDotSlash = False
+                       }

@@ -28,6 +28,8 @@ executable mk
   build-depends:    base >=4.12 && <5
                   , bytestring
                   , containers
+                  , extra
+                  , Glob
                   , megaparsec
                   , mtl
                   , optparse-applicative
