@@ -28,6 +28,7 @@ executable mk
   build-depends:    base >=4.12 && <5
                   , bytestring
                   , containers
+                  , conversion
                   , extra
                   , Glob
                   , megaparsec
