@@ -8,7 +8,7 @@ module Main
 -- base
 import Control.Monad.IO.Class
 import Data.Maybe
-import qualified System.Exit
+import System.Exit
 import System.IO
 
 -- bytestring
@@ -18,6 +18,7 @@ import System.IO
 -- import Data.Map.Strict (Map)
 
 -- mtl
+import Control.Monad.Except
 import Control.Monad.Reader
 
 -- path
@@ -44,10 +45,11 @@ main = do
   opts@Options{..} <- execOptionsParser
   when optVerbose $ hPrint stderr opts
 
-  runReaderT main' opts
+  result <- runReaderT (runExceptT main') opts
+  either die pure result
 
 
-main' :: (MonadReader Options m, MonadIO m) => m ()
+main' :: (MonadReader Options m, MonadError String m, MonadIO m) => m ()
 main' = do
   ask >>= printVerbose
 
@@ -81,12 +83,7 @@ printVerbose :: (MonadReader Options m, MonadIO m, Show a) => a -> m ()
 printVerbose = putVerbose . show
 
 
-die :: MonadIO m => String -> m a
-die = liftIO . System.Exit.die
--- TODO: instead of using `die` everywhere, use a constraint `MonadError String m`
-
-
-getTemplate :: (MonadReader Options m, MonadIO m) => m (Path Abs File)
+getTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
 getTemplate = do
   Options{..} <- ask
   case optTemplate of
@@ -94,18 +91,18 @@ getTemplate = do
     Nothing -> findTemplate
 
 
-findTemplate :: (MonadReader Options m, MonadIO m) => m (Path Abs File)
+findTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
 findTemplate = do
   Options{..} <- ask
   when (null optTemplateSearchDirs) $
-    die "Error: no template search paths"
+    throwError "Error: no template search paths"
 
   matchingTemplates <-
     catMaybes <$> traverse findTemplateInDir optTemplateSearchDirs
 
   case matchingTemplates of
     t:_ -> pure t
-    [] -> die "Error: no matching template found"
+    [] -> throwError "Error: no matching template found"
 
 
 findTemplateInDir
@@ -117,24 +114,3 @@ findTemplateInDir dir = do
   -- TODO: return an error if the match is ambigous (i.e., more than one file matches)
   pure Nothing
   -- error "TODO"
-
-
-{-
-findTemplatePath :: MonadIO m => Options -> m (Path Abs File)
-findTemplatePath Options{..}
-
-  | Just templatePath <- optTemplate =
-      pure templatePath
-
-  | optTemplateSearchDirs == [] =
-      fail "Error: no template search paths"
-
-  | otherwise = do
-      error "TODO"
--}
-
--- findTemplatePath :: Maybe (Path Abs File) -> [Path Abs Dir] -> IO (Path Abs File)
--- findTemplatePath (Just templatePath) _ = pure templatePath
--- findTemplatePath Nothing [] = fail "Error: no template search paths"
--- findTemplatePath Nothing dirs = do
---   error "TODO"
