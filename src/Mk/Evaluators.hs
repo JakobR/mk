@@ -16,7 +16,6 @@ import Control.Monad.IO.Class
 -- bytestring
 import Data.ByteString (ByteString)
 -- import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Char8 as B8
 
 -- containers
 import Data.Map (Map)
@@ -28,6 +27,11 @@ import Control.Monad.Reader
 
 -- path
 import Path
+
+-- text
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 
 -- mk
 import Mk.Template
@@ -44,13 +48,22 @@ type MonadEvaluator m = (MonadReader Ctx m, MonadError String m, MonadIO m)
 data Evaluator m = forall a. EvaluatorResult a => Evaluator !(m a)
 
 class EvaluatorResult a where
+  -- Note:
+  -- Later we might want to add an argument to specify a certain encoding that should be used.
+  -- Might be specified via a command-line argument.
+  -- (But we could also apply a UTF-8 -> ??? transformation on the outside.)
+
+  -- | Encode the evaluator result using UTF-8, if applicable.
   toByteString :: MonadError String m => a -> m ByteString
 
 instance EvaluatorResult ByteString where
   toByteString = pure . id
 
 instance EvaluatorResult String where
-  toByteString = pure . B8.pack  -- TODO: use proper UTF-8 encoding
+  toByteString = pure . Text.encodeUtf8 . Text.pack
+
+instance EvaluatorResult Text where
+  toByteString = pure . Text.encodeUtf8
 
 
 rawEvaluators
