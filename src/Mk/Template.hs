@@ -29,9 +29,6 @@ import qualified Data.Map as Map
 -- mtl
 import Control.Monad.Except
 
--- path
-import Path
-
 -- mk
 import Mk.Char8
 
@@ -54,12 +51,11 @@ newtype Template = Template { unTemplate :: [Chunk] }
 
 renderTemplate
   :: MonadError String m
-  => Map Var (Var -> Path Abs File -> m ByteString)
-  -> Path Abs File
+  => Map Var (m ByteString)
   -> Template
   -> m (BL.ByteString, Set Pos)
-renderTemplate evals target (Template chunks) = do
-  renderedChunks <- traverse (renderChunk evals target) chunks
+renderTemplate evals (Template chunks) = do
+  renderedChunks <- traverse (renderChunk evals) chunks
   let Pair b cs = combineRenderedChunks renderedChunks
   pure $ (toLazyByteString (blBuilder b), cs)
 {-# INLINABLE renderTemplate #-}
@@ -88,11 +84,10 @@ combineRenderedChunks = foldl' go z
 
 renderChunk
   :: MonadError String m
-  => Map Var (Var -> Path Abs File -> m ByteString)
-  -> Path Abs File
+  => Map Var (m ByteString)
   -> Chunk
   -> m RenderedChunk
-renderChunk evals target = \case
+renderChunk evals = \case
   ChunkCursor ->
     pure RenderedCursor
   ChunkVerbatim bs ->
@@ -102,7 +97,7 @@ renderChunk evals target = \case
       Nothing ->
         throwError $ "no evaluator for variable " <> show var
       Just eval ->
-        RenderedBytes . byteStringP <$> eval var target
+        RenderedBytes . byteStringP <$> eval
 
 
 -- | Represents a position in a string.

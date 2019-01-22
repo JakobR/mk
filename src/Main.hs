@@ -74,7 +74,7 @@ main' = do
 
   -- Evaluate the variables in the template
   (renderedTemplate, cursorPositions) <- do
-    renderTemplate allEvaluators optTarget template
+    renderTemplate (allEvaluators optTarget) template
   putVerbose $ "Rendered template: " <> show renderedTemplate
   putVerbose $ "Cursor positions: " <> show cursorPositions
 
