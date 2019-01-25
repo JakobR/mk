@@ -8,11 +8,9 @@ module Mk.Parser
 
 
 -- base
+import Data.Char (isAlphaNum)
 import Data.Maybe (fromMaybe)
 import Data.Void (Void)
-
--- bytestring
-import Data.ByteString (ByteString)
 
 -- megaparsec
 import Text.Megaparsec
@@ -20,18 +18,20 @@ import Text.Megaparsec
 -- mtl
 import Control.Monad.Except
 
+-- text
+import Data.Text (Text)
+
 -- mk
-import Mk.Char8
 import Mk.Template
 
 
-type Parser = Parsec Void ByteString
+type Parser = Parsec Void Text
 
 varP :: Parser Var
 varP = do
-  void $ single (ord8 '%')
-  varName <- takeWhile1P (Just "alphanumeric character") isAlphaNum8
-  void $ single (ord8 '%')
+  void $ single '%'
+  varName <- takeWhile1P (Just "alphanumeric character") isAlphaNum
+  void $ single '%'
   return (Var varName)
 
 chunkP :: Parser Chunk
@@ -40,7 +40,7 @@ chunkP = ChunkCursor <$ cursorP
          <|> fmap ChunkVerbatim verbatimP
   where
     cursorP = chunk "%HERE%"
-    verbatimP = takeWhile1P Nothing (/= ord8 '%')
+    verbatimP = takeWhile1P Nothing (/= '%')
 
 templateP :: Parser Template
 templateP = Template <$> many chunkP
@@ -52,7 +52,7 @@ setPosition pos =
 parseTemplate'
   :: MonadError String m
   => SourcePos
-  -> ByteString
+  -> Text
   -> m Template
 parseTemplate' pos str =
   case parse (setPosition pos *> templateP <* eof) "" str of
@@ -63,7 +63,7 @@ parseTemplate' pos str =
 parseTemplate
   :: MonadError String m
   => Maybe FilePath  -- ^ name of source file
-  -> ByteString      -- ^ text to parse
+  -> Text            -- ^ text to parse
   -> m Template
 parseTemplate srcName =
   parseTemplate' (initialPos $ fromMaybe "<string>" srcName)

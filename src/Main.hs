@@ -11,10 +11,6 @@ import Data.List (isPrefixOf)
 import System.Exit
 import System.IO
 
--- bytestring
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as ByteString.Lazy
-
 -- extra
 import Data.List.Extra (replace)
 
@@ -30,6 +26,10 @@ import Path
 
 -- path-io
 import qualified Path.IO
+
+-- text
+import qualified Data.Text.IO as Text.IO
+import qualified Data.Text.Lazy.IO as Text.Lazy.IO
 
 -- transformers
 import Control.Monad.Trans.Maybe
@@ -66,7 +66,7 @@ main' = do
 
   -- Read and parse template file
   templateRaw <-
-    liftIO $ ByteString.readFile (toFilePath templatePath)
+    liftIO $ Text.IO.readFile (toFilePath templatePath)
   template <-
     withErrorPrefix ("when parsing " <> show templatePath <> ":\n") $
     parseTemplate (Just $ toFilePath templatePath) templateRaw
@@ -83,7 +83,7 @@ main' = do
     targetExists <- Path.IO.doesFileExist optTarget
     when targetExists $
       throwError "Target file already exists. Pass the option --force to overwrite it anyways."
-  liftIO $ ByteString.Lazy.writeFile (toFilePath optTarget) renderedTemplate
+  liftIO $ Text.Lazy.IO.writeFile (toFilePath optTarget) renderedTemplate
 
   unless optQuiet $
     forM_ cursorPositions putCursorLn

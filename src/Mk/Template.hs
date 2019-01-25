@@ -12,13 +12,6 @@ module Mk.Template
 
 -- base
 import Data.Foldable
-import Data.Word (Word8)
-
--- bytestring
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.ByteString.Builder
 
 -- containers
 import Data.Set (Set)
@@ -29,17 +22,20 @@ import qualified Data.Map as Map
 -- mtl
 import Control.Monad.Except
 
--- mk
-import Mk.Char8
+-- text
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import Data.Text.Lazy.Builder
 
 
 
-newtype Var = Var { unVar :: ByteString }
+newtype Var = Var { unVar :: Text }
   deriving (Eq, Ord, Show)
 
 
 data Chunk
-  = ChunkVerbatim !ByteString
+  = ChunkVerbatim !Text
   | ChunkVar !Var
   | ChunkCursor
   deriving Show
@@ -51,13 +47,14 @@ newtype Template = Template { unTemplate :: [Chunk] }
 
 renderTemplate
   :: MonadError String m
-  => Map Var (m ByteString)
+  => Map Var (m Text)
   -> Template
-  -> m (BL.ByteString, Set Pos)
+  -> m (TL.Text, Set Pos)
 renderTemplate evals (Template chunks) = do
   renderedChunks <- traverse (renderChunk evals) chunks
   let Pair b cs = combineRenderedChunks renderedChunks
-  pure $ (toLazyByteString (blBuilder b), cs)
+  pure $ (toLazyText (bpBuilder b), cs)
+  -- TODO: check out package Foldl for this
 {-# INLINABLE renderTemplate #-}
 
 
@@ -74,7 +71,7 @@ combineRenderedChunks = foldl' go z
   where
     go :: Pair BuilderP (Set Pos) -> RenderedChunk -> Pair BuilderP (Set Pos)
     go (Pair b cs) RenderedCursor =
-      Pair b (Set.insert (blPos b) cs)
+      Pair b (Set.insert (bpPos b) cs)
     go (Pair b cs) (RenderedBytes b') =
       Pair (b <> b') cs
 
@@ -84,20 +81,20 @@ combineRenderedChunks = foldl' go z
 
 renderChunk
   :: MonadError String m
-  => Map Var (m ByteString)
+  => Map Var (m Text)
   -> Chunk
   -> m RenderedChunk
 renderChunk evals = \case
   ChunkCursor ->
     pure RenderedCursor
-  ChunkVerbatim bs ->
-    pure . RenderedBytes $ byteStringP bs
+  ChunkVerbatim t ->
+    pure . RenderedBytes $ fromTextP t
   ChunkVar var ->
     case evals Map.!? var of
       Nothing ->
         throwError $ "no evaluator for variable " <> show var
       Just eval ->
-        RenderedBytes . byteStringP <$> eval
+        RenderedBytes . fromTextP <$> eval
 
 
 -- | Represents a position in a string.
@@ -116,20 +113,23 @@ initialPos :: Pos
 initialPos = Pos 0 0 0
 
 
-updatePos :: Pos -> Word8 -> Pos
-updatePos (Pos i r c) b
-  | b == newline8 = Pos (i+1) (r+1) 0
-  | otherwise = Pos (i+1) r (c+1)
+updatePos :: Pos -> Char -> Pos
+updatePos (Pos i r _) '\n' = Pos (i+1) (r+1) 0
+updatePos (Pos i r c) _    = Pos (i+1) r (c+1)
+
+
+finalPos :: Text -> Pos
+finalPos = T.foldl updatePos initialPos
 
 
 -- | Like @Builder@, but also stores the length, and row/column of the last position.
 data BuilderP = BuilderP
-  { blPos :: !Pos
+  { bpPos :: !Pos
     -- ^ The position at the end of the @Builder@.
     -- This means @posAbsolute@ is the length,
     -- @posRow@ is the number of newlines,
     -- and @posCol@ is the number of bytes on the last line.
-  , blBuilder :: !Builder
+  , bpBuilder :: !Builder
   }
 
 
@@ -145,8 +145,9 @@ instance Semigroup BuilderP where
 
 
 instance Monoid BuilderP where
-    mempty = BuilderP initialPos mempty
+  mempty = BuilderP initialPos mempty
+  mappend = (<>)
 
 
-byteStringP :: ByteString -> BuilderP
-byteStringP b = BuilderP (B.foldl updatePos initialPos b) (byteString b)
+fromTextP :: Text -> BuilderP
+fromTextP t = BuilderP (finalPos t) (fromText t)
