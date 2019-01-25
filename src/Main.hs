@@ -168,7 +168,7 @@ matches
   -> Path Abs File  -- ^ template file path
   -> m Bool
 matches target template = do
-  case Glob.tryCompileWith compOptions templateName' of
+  case Glob.tryCompileWith compileOptions templateName' of
     Left err ->
       throwError $ "Error trying to match against " <> show template <> ": " <> err
     Right templatePattern -> do
@@ -182,7 +182,7 @@ matches target template = do
     templateName = toFilePath (filename template)
     templateName' = replace "=template=" "*" templateName
 
-    compOptions =
+    compileOptions =
       Glob.CompOptions{ Glob.characterClasses = False
                       , Glob.characterRanges = False
                       , Glob.numberRanges = False
@@ -197,6 +197,7 @@ matches target template = do
                        , Glob.ignoreCase = False
                        , Glob.ignoreDotSlash = False
                        }
+
 
 withErrorPrefix
   :: MonadError String m

@@ -54,12 +54,11 @@ renderTemplate evals (Template chunks) = do
   renderedChunks <- traverse (renderChunk evals) chunks
   let Pair b cs = combineRenderedChunks renderedChunks
   pure $ (toLazyText (bpBuilder b), cs)
-  -- TODO: check out package Foldl for this
 {-# INLINABLE renderTemplate #-}
 
 
 data RenderedChunk
-  = RenderedBytes !BuilderP
+  = RenderedText !BuilderP
   | RenderedCursor
 
 
@@ -72,7 +71,7 @@ combineRenderedChunks = foldl' go z
     go :: Pair BuilderP (Set Pos) -> RenderedChunk -> Pair BuilderP (Set Pos)
     go (Pair b cs) RenderedCursor =
       Pair b (Set.insert (bpPos b) cs)
-    go (Pair b cs) (RenderedBytes b') =
+    go (Pair b cs) (RenderedText b') =
       Pair (b <> b') cs
 
     z :: Pair BuilderP (Set Pos)
@@ -88,19 +87,19 @@ renderChunk evals = \case
   ChunkCursor ->
     pure RenderedCursor
   ChunkVerbatim t ->
-    pure . RenderedBytes $ fromTextP t
+    pure . RenderedText $ fromTextP t
   ChunkVar var ->
     case evals Map.!? var of
       Nothing ->
         throwError $ "no evaluator for variable " <> show var
       Just eval ->
-        RenderedBytes . fromTextP <$> eval
+        RenderedText . fromTextP <$> eval
 
 
 -- | Represents a position in a string.
 data Pos = Pos
   { posAbsolute :: !Word
-    -- ^ index into the bytestring (i.e., the number of bytes to the left of the position)
+    -- ^ index into the text (i.e., the number of characters to the left of the position)
   , posRow :: !Word
     -- ^ the row of the position (starting at 0)
   , posCol :: !Word
@@ -128,7 +127,7 @@ data BuilderP = BuilderP
     -- ^ The position at the end of the @Builder@.
     -- This means @posAbsolute@ is the length,
     -- @posRow@ is the number of newlines,
-    -- and @posCol@ is the number of bytes on the last line.
+    -- and @posCol@ is the number of characters on the last line.
   , bpBuilder :: !Builder
   }
 
