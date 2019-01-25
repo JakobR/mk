@@ -57,9 +57,6 @@ main' = do
   opts@Options{..} <- ask
   printVerbose opts
 
-  whenVerbose $ liftIO $ do
-    hSetBuffering stderr NoBuffering
-
   -- Find matching template file
   templatePath <- getTemplate
   putVerbose $ "Selected template: " <> show templatePath
