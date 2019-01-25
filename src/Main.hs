@@ -59,7 +59,7 @@ main' = do
 
   -- Find matching template file
   templatePath <- getTemplate
-  putVerbose $ "Selected template: " <> show templatePath
+  putVerboseLn $ "Selected template: " <> show templatePath
 
   -- Read and parse template file
   templateRaw <-
@@ -67,13 +67,13 @@ main' = do
   template <-
     withErrorPrefix ("when parsing " <> show templatePath <> ":\n") $
     parseTemplate (Just $ toFilePath templatePath) templateRaw
-  putVerbose $ "Parsed template: " <> show template
+  putVerboseLn $ "Parsed template: " <> show template
 
   -- Evaluate the variables in the template
   (renderedTemplate, cursorPositions) <- do
     renderTemplate (allEvaluators optTarget) template
-  putVerbose $ "Rendered template: " <> show renderedTemplate
-  putVerbose $ "Cursor positions: " <> show cursorPositions
+  putVerboseLn $ "Rendered template: " <> show renderedTemplate
+  putVerboseLn $ "Cursor positions: " <> show cursorPositions
 
   -- Write target file
   unless optForce $ do
@@ -102,13 +102,13 @@ whenVerbose action = do
   when isVerbose action
 
 
-putVerbose :: (MonadReader Options m, MonadIO m) => String -> m ()
-putVerbose msg =
+putVerboseLn :: (MonadReader Options m, MonadIO m) => String -> m ()
+putVerboseLn msg =
   whenVerbose (liftIO $ hPutStrLn stderr msg)
 
 
 printVerbose :: (MonadReader Options m, MonadIO m, Show a) => a -> m ()
-printVerbose = putVerbose . show
+printVerbose = putVerboseLn . show
 
 
 getTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
@@ -139,18 +139,18 @@ findTemplateInDir
   => Path Abs Dir
   -> m (Maybe (Path Abs File))
 findTemplateInDir dir = do
-  putVerbose $ "Searching directory: " <> show dir
+  putVerboseLn $ "Searching directory: " <> show dir
 
   target <- asks optTarget
   (_, files) <- Path.IO.listDir dir
 
   let isHidden = ("." `isPrefixOf`) . toFilePath . filename
       templates = filter (not . isHidden) files
-  putVerbose $ "Found templates: " <> show templates
+  putVerboseLn $ "Found templates: " <> show templates
 
   matchingTemplates <-
     filterM (target `matches`) templates
-  putVerbose $ "Matching templates: " <> show matchingTemplates
+  putVerboseLn $ "Matching templates: " <> show matchingTemplates
 
   case matchingTemplates of
     [] -> pure Nothing
@@ -173,8 +173,8 @@ matches target template = do
       throwError $ "Error trying to match against " <> show template <> ": " <> err
     Right templatePattern -> do
       let result = Glob.matchWith matchOptions templatePattern targetName
-      putVerbose $ "Matching " <> show targetName <>
-        " against pattern " <> show templatePattern <> ": " <> show result
+      putVerboseLn ("Matching " <> show targetName
+                    <> " against pattern " <> show templatePattern <> ": " <> show result)
       pure result
 
   where
