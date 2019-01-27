@@ -11,10 +11,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Mk.Options
-  ( Options'(..)
-  , Options
-  , execOptionsParser
-  , Config(..)
+  ( Config(..)
   , loadConfig
   ) where
 
@@ -25,6 +22,7 @@ import Data.Char (toLower)
 import Data.Foldable
 import Data.List (isPrefixOf)
 import Data.Maybe
+import System.IO (hPutStrLn, stderr)
 
 -- containers
 import Data.Map.Strict (Map)
@@ -55,6 +53,7 @@ import Mk.Template
 
 
 
+-- | The full configuration.
 data Config = Config
   { cfgTemplateSearchDirs :: [Path Abs Dir]
   -- ^ we search these directories to discover templates
@@ -73,12 +72,26 @@ data VarValue
   | VarCommand !Text
   deriving Show
 
+
+-- | Command-line options.
+data UnresolvedOptions = UnresolvedOptions
+  { optConfigFile :: FilePath
+  , optTemplate :: Maybe FilePath
+  , optForce :: Bool
+  , optVerbose :: Bool
+  , optQuiet :: Bool
+  , optTarget :: FilePath
+  }
+
+
 data UnresolvedVarOverride = UVOverride
   { uvoName :: Text
   , uvoValue :: VarValue
   }
   deriving Generic
 
+
+-- | Settings in the config file.
 data UnresolvedConfigFile = UnresolvedConfigFile
   { ucfgTemplateSearchDirs :: [FilePath]
   , ucfgVariableOverrides :: [UnresolvedVarOverride]
@@ -104,27 +117,12 @@ instance Interpret UnresolvedVarOverride
 instance Interpret UnresolvedConfigFile
 
 
-configInterpretOptions :: InterpretOptions
-configInterpretOptions =
+configFileInterpretOptions :: InterpretOptions
+configFileInterpretOptions =
   defaultInterpretOptions{ fieldModifier = cfgFieldModifier }
-                         -- , constructorModifier = cfgConstructorModifier }
   where
     cfgFieldModifier t = fromMaybe t $ asum [ headToLower <$> Text.stripPrefix pfx t | pfx <- fieldPfxs ]
     fieldPfxs = ["uvo", "ucfg"]
-
-    -- cfgConstructorModifier t = fromMaybe t $ asum [ Text.stripPrefix pfx t | pfx <- constructorPfxs ]
-    -- constructorPfxs = ["Var"]
-
-    -- dropPrefix :: Text -> Text -> Text
-    -- dropPrefix pfx (dropPrefixMay pfx -> Just name) = name
-    -- dropPrefix _ name = name
-
-    -- dropPrefixMay :: Text -> Text -> Maybe Text
-    -- dropPrefixMay pfx pfxName = do
-    --   capName <- Text.stripPrefix pfx pfxName
-    --   (x, xs) <- Text.uncons capName
-    --   let name = Text.cons (toLower x) xs
-    --   return name
 
     headToLower :: Text -> Text
     headToLower (Text.uncons -> Just (x,xs)) = Text.cons (toLower x) xs
@@ -134,15 +132,21 @@ configInterpretOptions =
 resolveConfig
   :: MonadIO m
   => UnresolvedConfigFile
-  -> Options
+  -> UnresolvedOptions
   -> m Config
-resolveConfig c Options{..} = do
+resolveConfig UnresolvedConfigFile{..} UnresolvedOptions{..} = do
+
+  resolvedTarget <-
+    resolveFile' optTarget
+
+  resolvedTemplate <-
+    traverse resolveFile' optTemplate
 
   resolvedTemplateSearchDirs <-
-    traverse (resolveTilde >=> resolveDir') (ucfgTemplateSearchDirs c)
+    traverse (resolveTilde >=> resolveDir') ucfgTemplateSearchDirs
 
   let toPair x = (Var (uvoName x), uvoValue x)
-      rawVarOverrides = toPair <$> ucfgVariableOverrides c
+      rawVarOverrides = toPair <$> ucfgVariableOverrides
 
       repeatedElems = Map.keys . Map.filter (>1) . Map.fromList . map (, 1 :: Int)
       repeatedVarNames =  repeatedElems $ map fst rawVarOverrides
@@ -153,11 +157,11 @@ resolveConfig c Options{..} = do
 
   return Config{ cfgTemplateSearchDirs = resolvedTemplateSearchDirs
                , cfgVariableOverrides = resolvedVarOverrides
-               , cfgTemplate = optTemplate
+               , cfgTemplate = resolvedTemplate
                , cfgForce = optForce
                , cfgVerbose = optVerbose
                , cfgQuiet = optQuiet
-               , cfgTarget = optTarget
+               , cfgTarget = resolvedTarget
                }
 
 
@@ -174,44 +178,10 @@ resolveTilde p
   where
     pfx = "~/"
 
--- resolveDirWithTilde'
---   :: MonadIO m
---   => FilePath
---   -> m (Path Abs Dir)
--- resolveDirWithTilde' = resolveTilde >=> resolveDir'
---   -- | "~/" `isPrefixOf` p = do
---   --     homeDir <- getHomeDir
---   --     resolveDir' (toFilePath homeDir FilePath.</> drop 2 p)
---   -- | otherwise = resolveDir' p
 
-
-loadConfig :: IO Config
-loadConfig = do
-  opts@Options{..} <- execOptionsParser
-  unresolvedConfig <- inputFile (autoWith configInterpretOptions) (toFilePath optConfigFile)
-  config <- resolveConfig unresolvedConfig opts
-  return config
-
-
-data Options' dir file = Options
-  { optTemplateSearchDirs :: [dir]  -- TODO: remove from options (move to config file)
-  , optConfigFile :: file
-  , optTemplate :: Maybe file
-  , optForce :: Bool
-  , optVerbose :: Bool
-  , optQuiet :: Bool
-  , optTarget :: file
-  }
-  deriving Show
-
-type Options = Options' (Path Abs Dir) (Path Abs File)
-type OptionsUnresolved = Options' FilePath FilePath
-
-
-optionsParser :: Path Abs File -> Parser OptionsUnresolved
+optionsParser :: Path Abs File -> Parser UnresolvedOptions
 optionsParser defaultConfigFile =
-  pure Options
-  <*> many templateSearchDir
+  pure UnresolvedOptions
   <*> configFile
   <*> optional template
   <*> forceFlag
@@ -243,15 +213,6 @@ optionsParser defaultConfigFile =
                ++ "choosing it by matching on the target name.")
       <> metavar "TEMPLATE"
 
-    templateSearchDir =
-      strOption $
-      short 'd'
-      <> long "search-dir"
-      <> help ("Search the given directory for a matching template. "
-               ++ "This option may be given multiple times. "
-               ++ "Multiple directories are searched in the order they are given.")
-      <> metavar "DIR"
-
     forceFlag =
       switch $
       short 'f'
@@ -271,40 +232,12 @@ optionsParser defaultConfigFile =
       <> help "Less output on stdout, in particular the cursor positions will not be printed."
 
 
-optionsParserInfo :: Path Abs File -> ParserInfo OptionsUnresolved
+optionsParserInfo :: Path Abs File -> ParserInfo UnresolvedOptions
 optionsParserInfo defaultConfigFile =
   info (optionsParser defaultConfigFile <**> helper)
        (fullDesc
         <> progDesc "Creates the file TARGET from a template."
         <> header "mk")
-
-
-resolveOptions
-  :: MonadIO m
-  => OptionsUnresolved
-  -> m Options
-resolveOptions o = do
-
-  resolvedConfigFile <-
-    resolveFile' (optConfigFile o)
-
-  resolvedTarget <-
-    resolveFile' (optTarget o)
-
-  resolvedTemplateSearchDirs <-
-    traverse resolveDir' (optTemplateSearchDirs o)
-
-  resolvedTemplate <-
-    traverse resolveFile' (optTemplate o)
-
-  return Options{ optTarget = resolvedTarget
-                , optConfigFile = resolvedConfigFile
-                , optTemplateSearchDirs = resolvedTemplateSearchDirs
-                , optTemplate = resolvedTemplate
-                , optForce = optForce o
-                , optVerbose = optVerbose o
-                , optQuiet = optQuiet o
-                }
 
 
 getDefaultConfigFile :: IO (Path Abs File)
@@ -315,8 +248,20 @@ getDefaultConfigFile = do
   return (defaultConfigDir </> configFilename)
 
 
-execOptionsParser :: IO Options
-execOptionsParser = do
+loadConfig :: IO Config
+loadConfig = do
   defaultConfigFile <- getDefaultConfigFile
-  unresolvedOptions <- execParser (optionsParserInfo defaultConfigFile)
-  resolveOptions unresolvedOptions
+
+  unresolvedOptions@UnresolvedOptions{..} <-
+    execParser (optionsParserInfo defaultConfigFile)
+
+  resolvedConfigFile <- resolveFile' optConfigFile
+
+  when optVerbose $
+    hPutStrLn stderr ("Loading configuration from "
+                      <> show resolvedConfigFile <> "...")
+
+  unresolvedConfigFile <-
+    inputFile (autoWith configFileInterpretOptions) (toFilePath resolvedConfigFile)
+
+  resolveConfig unresolvedConfigFile unresolvedOptions
