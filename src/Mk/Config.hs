@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Mk.Options
+module Mk.Config
   ( Config(..)
   , loadConfig
   ) where

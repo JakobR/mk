@@ -23,8 +23,8 @@ common warnings
 executable mk
   import:           warnings
   main-is:          Main.hs
-  other-modules:    Mk.Evaluators
-                  , Mk.Options
+  other-modules:    Mk.Config
+                  , Mk.Evaluators
                   , Mk.Parser
                   , Mk.Template
   build-depends:    base >=4.12 && <5

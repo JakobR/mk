@@ -36,7 +36,7 @@ import Control.Monad.Trans.Maybe
 
 -- mk
 import Mk.Evaluators
-import Mk.Options
+import Mk.Config
 import Mk.Parser
 import Mk.Template
 
