@@ -43,19 +43,18 @@ import Mk.Template
 
 main :: IO ()
 main = do
-  opts@Options{..} <- execOptionsParser
-  when optVerbose $ hPrint stderr opts
+  cfg@Config{..} <- loadConfig
+  when cfgVerbose $ hPrint stderr cfg
 
-  result <- runReaderT (runExceptT main') opts
+  result <- runReaderT (runExceptT main') cfg
   case result of
     Left err -> die $ "Error: " ++ err
     Right x -> pure x
 
 
-main' :: (MonadReader Options m, MonadError String m, MonadIO m) => m ()
+main' :: (MonadReader Config m, MonadError String m, MonadIO m) => m ()
 main' = do
-  opts@Options{..} <- ask
-  printVerbose opts
+  Config{..} <- ask
 
   -- Find matching template file
   templatePath <- getTemplate
@@ -71,18 +70,18 @@ main' = do
 
   -- Evaluate the variables in the template
   (renderedTemplate, cursorPositions) <- do
-    renderTemplate (allEvaluators optTarget) template
+    renderTemplate (allEvaluators cfgTarget) template
   putVerboseLn $ "Rendered template: " <> show renderedTemplate
   putVerboseLn $ "Cursor positions: " <> show cursorPositions
 
   -- Write target file
-  unless optForce $ do
-    targetExists <- Path.IO.doesFileExist optTarget
+  unless cfgForce $ do
+    targetExists <- Path.IO.doesFileExist cfgTarget
     when targetExists $
       throwError "Target file already exists. Pass the option --force to overwrite it anyways."
-  liftIO $ Text.Lazy.IO.writeFile (toFilePath optTarget) renderedTemplate
+  liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
 
-  unless optQuiet $
+  unless cfgQuiet $
     forM_ cursorPositions putCursorLn
 
 
@@ -96,32 +95,28 @@ putCursorLn Pos{..} = liftIO $ do
   putStrLn (show posCol)
 
 
-whenVerbose :: MonadReader Options m => m () -> m ()
+whenVerbose :: MonadReader Config m => m () -> m ()
 whenVerbose action = do
-  isVerbose <- asks optVerbose
+  isVerbose <- asks cfgVerbose
   when isVerbose action
 
 
-putVerboseLn :: (MonadReader Options m, MonadIO m) => String -> m ()
+putVerboseLn :: (MonadReader Config m, MonadIO m) => String -> m ()
 putVerboseLn msg =
   whenVerbose (liftIO $ hPutStrLn stderr msg)
 
 
-printVerbose :: (MonadReader Options m, MonadIO m, Show a) => a -> m ()
-printVerbose = putVerboseLn . show
-
-
-getTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
+getTemplate :: (MonadReader Config m, MonadError String m, MonadIO m) => m (Path Abs File)
 getTemplate = do
-  Options{..} <- ask
-  case optTemplate of
+  Config{..} <- ask
+  case cfgTemplate of
     Just t -> pure t
     Nothing -> findTemplate
 
 
-findTemplate :: (MonadReader Options m, MonadError String m, MonadIO m) => m (Path Abs File)
+findTemplate :: (MonadReader Config m, MonadError String m, MonadIO m) => m (Path Abs File)
 findTemplate = do
-  searchDirs <- asks optTemplateSearchDirs
+  searchDirs <- asks cfgTemplateSearchDirs
 
   when (null searchDirs) $
     throwError "Error: no template search paths"
@@ -135,13 +130,13 @@ findTemplate = do
 
 
 findTemplateInDir
-  :: (MonadReader Options m, MonadError String m, MonadIO m)
+  :: (MonadReader Config m, MonadError String m, MonadIO m)
   => Path Abs Dir
   -> m (Maybe (Path Abs File))
 findTemplateInDir dir = do
   putVerboseLn $ "Searching directory: " <> show dir
 
-  target <- asks optTarget
+  target <- asks cfgTarget
   (_, files) <- Path.IO.listDir dir
 
   let isHidden = ("." `isPrefixOf`) . toFilePath . filename
@@ -163,7 +158,7 @@ findTemplateInDir dir = do
 --
 -- For compatibility with vim-template, the string `=template=` acts like `*`.
 matches
-  :: (MonadReader Options m, MonadError String m, MonadIO m)
+  :: (MonadReader Config m, MonadError String m, MonadIO m)
   => Path Abs File  -- ^ target file path
   -> Path Abs File  -- ^ template file path
   -> m Bool

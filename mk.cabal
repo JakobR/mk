@@ -30,7 +30,9 @@ executable mk
   build-depends:    base >=4.12 && <5
                   , containers
                   , conversion
+                  , dhall
                   , extra
+                  , filepath
                   , Glob
                   , megaparsec
                   , mtl
