@@ -39,6 +39,7 @@ executable mk
                   , optparse-applicative
                   , path
                   , path-io
+                  , process
                   , text
                   , transformers
   hs-source-dirs:   src

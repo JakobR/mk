@@ -5,13 +5,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Mk.Evaluators
-  ( allEvaluators
+  ( builtinEvaluators
+  , constEvaluator
+  , commandEvaluator
   ) where
 
 -- base
 import Control.Monad.IO.Class
+import System.Exit
 
 -- containers
 import Data.Map (Map)
@@ -23,6 +27,9 @@ import Control.Monad.Reader
 
 -- path
 import Path
+
+-- process
+import System.Process (shell, readCreateProcessWithExitCode)
 
 -- text
 import Data.Text (Text)
@@ -52,26 +59,26 @@ instance EvaluatorResult Text where
   toText = pure . id
 
 
-rawEvaluators
+rawBuiltinEvaluators
   :: forall m. (MonadError String m, MonadIO m)
   => [(Var, Evaluator (ReaderT Ctx m))]
-rawEvaluators =
+rawBuiltinEvaluators =
       [ (Var "HASKELLRESOLVER", Evaluator testEvaluator)
       , (Var "HASKELLMODULE", Evaluator testEvaluator2)
       ]
 
-allEvaluators
+builtinEvaluators
   :: forall m. (MonadError String m, MonadIO m)
   => Path Abs File  -- ^ path to target file
   -> Map Var (m Text)
-allEvaluators target = Map.fromList $ applyCtx' <$> rawEvaluators
+builtinEvaluators target = Map.fromList $ applyCtx' <$> rawBuiltinEvaluators
   where
     applyCtx' (v, e) = (v, applyCtx (mkCtx v) e)
     applyCtx ctx (Evaluator rma) = runReaderT rma ctx >>= toText
     mkCtx v = Ctx{ ctxVar = v
                  , ctxTarget = target
                  }
-{-# INLINABLE allEvaluators #-}
+{-# INLINABLE builtinEvaluators #-}
 
 testEvaluator :: MonadEvaluator m => m Text
 testEvaluator = do
@@ -84,3 +91,19 @@ testEvaluator2 = do
   var <- asks ctxVar
   liftIO $ putStrLn $ "testEvaluator2 was called for " <> show var
   pure "HAHAHA"
+
+-- | @constEvaluator x@ always evaluates to `x`.
+constEvaluator :: Monad m => Text -> m Text
+constEvaluator = pure
+{-# INLINABLE constEvaluator #-}
+
+-- | @commandEvaluator cmd@ executes the shell command `cmd` and returns its output.
+commandEvaluator :: (MonadError String m, MonadIO m) => Text -> m Text
+commandEvaluator (Text.unpack -> cmd) = do
+  (exitCode, out, err) <- liftIO $ readCreateProcessWithExitCode (shell cmd) ""
+  case exitCode of
+    ExitSuccess -> return (Text.pack out)
+    _ -> throwError ("Error running shell command `" <> cmd <> "`: exitCode = " <> show exitCode <> "\n\n"
+                     <> "Output on stdout: \n" <> out <> "\n\n"
+                     <> "Output on stderr: \n" <> err <> "\n")
+{-# INLINABLE commandEvaluator #-}

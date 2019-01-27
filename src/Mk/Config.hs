@@ -12,6 +12,7 @@
 
 module Mk.Config
   ( Config(..)
+  , VarValue(..)
   , loadConfig
   ) where
 
