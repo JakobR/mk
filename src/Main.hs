@@ -69,7 +69,7 @@ main' = do
   putVerboseLn $ "Parsed template: " <> show template
 
   -- Evaluate the variables in the template
-  let overrideEvaluators = evalVarValue <$> cfgVariableOverrides
+  let overrideEvaluators = evalVarValue cfgTarget <$> cfgVariableOverrides
       -- Note: (<>) for Map is left-biased
       allEvaluators = overrideEvaluators <> builtinEvaluators cfgTarget
   (renderedTemplate, cursorPositions) <- do
@@ -88,9 +88,9 @@ main' = do
   unless cfgQuiet $
     forM_ cursorPositions putCursorLn
 
-evalVarValue :: (MonadError String m, MonadIO m) => VarValue -> Evaluator m
-evalVarValue (VarConst txt) = constEvaluator txt
-evalVarValue (VarCommand cmd) = commandEvaluator cmd
+evalVarValue :: (MonadError String m, MonadIO m) => Path Abs File -> VarValue -> Evaluator m
+evalVarValue _ (VarConst txt) = constEvaluator txt
+evalVarValue target (VarCommand cmd) = commandEvaluator target cmd
 
 -- | Prints the given position in the format "<abs>:<row>:<col>".
 putCursorLn :: MonadIO m => Pos -> m ()

@@ -18,8 +18,10 @@ module Mk.Evaluators
   ) where
 
 -- base
+import Control.Exception
 import Control.Monad.IO.Class
 import Data.Void
+import System.Environment.Blank
 import System.Exit
 
 -- containers
@@ -244,15 +246,25 @@ constEvaluator txt = Evaluator "Returns a constant value." (pure txt)
 {-# INLINABLE constEvaluator #-}
 
 -- | @commandEvaluator cmd@ executes the shell command `cmd` and returns its output.
--- TODO: pass the path of the target file as environment variable (MK_TARGET?)
-commandEvaluator :: MonadEvaluator m => Text -> Evaluator m
-commandEvaluator (Text.unpack -> cmd) = Evaluator "Returns the standard output of a shell command" action
+-- The absolute path to the target file is available in the environment variable `MK_TARGET`.
+commandEvaluator :: MonadEvaluator m => Path Abs File -> Text -> Evaluator m
+commandEvaluator target (Text.unpack -> cmd) =
+  Evaluator "Returns the standard output of a shell command" action
   where
     action = do
-      (exitCode, out, err) <- liftIO $ readCreateProcessWithExitCode (shell cmd) ""
+      (exitCode, out, err) <-
+        liftIO $
+        maskEnv "MK_TARGET" (toFilePath target) $
+        readCreateProcessWithExitCode (shell cmd) ""
       case exitCode of
         ExitSuccess -> return (Text.pack out)
         _ -> throwError ("Error running shell command `" <> cmd <> "`: exitCode = " <> show exitCode <> "\n\n"
                          <> "Output on stdout: \n" <> out <> "\n\n"
                          <> "Output on stderr: \n" <> err <> "\n")
 {-# INLINABLE commandEvaluator #-}
+
+maskEnv :: String -> String -> IO a -> IO a
+maskEnv key tempValue action = do
+  oldValue <- getEnv key
+  finally (setEnv key tempValue True >> action)
+          (maybe (unsetEnv key) (\v -> setEnv key v True) oldValue)
