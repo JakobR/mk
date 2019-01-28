@@ -50,8 +50,7 @@ import Mk.Template
 
 -- | Each variable evaluator is evaluated with a context of this type.
 data Ctx = Ctx
-  { ctxVar :: !Var -- TODO: we don't really need this anymore since the variable is now part of EvaluatorInfo
-  , ctxTarget :: !(Path Abs File)
+  { ctxTarget :: !(Path Abs File)
   }
 
 type MonadEvaluator m = (MonadError String m, MonadIO m)
@@ -112,11 +111,10 @@ builtinEvaluators target = Map.fromList $ runWithCtx <$> rawBuiltinEvaluators
   where
     runWithCtx EvaluatorInfo{..} =
       ( eiIntendedVar
-      , Evaluator eiDescription (runEvaluatorAction eiAction $ mkCtx eiIntendedVar)
+      , Evaluator eiDescription (runEvaluatorAction eiAction ctx)
       )
-    mkCtx v = Ctx{ ctxVar = v
-                 , ctxTarget = target
-                 }
+    ctx = Ctx{ ctxTarget = target
+             }
 {-# INLINABLE builtinEvaluators #-}
 
 
