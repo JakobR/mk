@@ -83,6 +83,7 @@ main' = do
     targetExists <- Path.IO.doesFileExist cfgTarget
     when targetExists $
       throwError "Target file already exists. Pass the option --force to overwrite it anyways."
+  Path.IO.ensureDir (parent cfgTarget)
   liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
 
   unless cfgQuiet $
