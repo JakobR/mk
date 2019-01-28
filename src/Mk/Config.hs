@@ -74,6 +74,7 @@ data VarValue
   deriving Show
 
 
+-- TODO: Add an option to view descriptions of variables (should also list variables from config-file).
 -- | Command-line options.
 data UnresolvedOptions = UnresolvedOptions
   { optConfigFile :: FilePath

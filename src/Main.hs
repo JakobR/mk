@@ -28,7 +28,6 @@ import Path
 import qualified Path.IO
 
 -- text
-import Data.Text (Text)
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Lazy.IO as Text.Lazy.IO
 
@@ -74,7 +73,7 @@ main' = do
       -- Note: (<>) for Map is left-biased
       allEvaluators = overrideEvaluators <> builtinEvaluators cfgTarget
   (renderedTemplate, cursorPositions) <- do
-    renderTemplate allEvaluators template
+    renderTemplate (runEvaluator <$> allEvaluators) template
   putVerboseLn $ "Rendered template: " <> show renderedTemplate
   putVerboseLn $ "Cursor positions: " <> show cursorPositions
 
@@ -89,7 +88,7 @@ main' = do
   unless cfgQuiet $
     forM_ cursorPositions putCursorLn
 
-evalVarValue :: (MonadError String m, MonadIO m) => VarValue -> m Text
+evalVarValue :: (MonadError String m, MonadIO m) => VarValue -> Evaluator m
 evalVarValue (VarConst txt) = constEvaluator txt
 evalVarValue (VarCommand cmd) = commandEvaluator cmd
 
