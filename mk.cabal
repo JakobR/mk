@@ -29,17 +29,19 @@ executable mk
                   , Mk.Template
   build-depends:    base >=4.12 && <5
                   , containers
-                  , conversion
                   , dhall
                   , extra
                   , filepath
                   , Glob
+                  , hostname
+                  , lens
                   , megaparsec
                   , mtl
                   , optparse-applicative
                   , path
                   , path-io
                   , process
+                  , safe
                   , text
                   , time
                   , transformers

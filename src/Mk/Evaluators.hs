@@ -20,6 +20,8 @@ module Mk.Evaluators
 -- base
 import Control.Exception
 import Control.Monad.IO.Class
+import Data.Char
+import Data.Function (on)
 import Data.Void
 import System.Environment.Blank
 import System.Exit
@@ -27,6 +29,12 @@ import System.Exit
 -- containers
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+
+-- hostname
+import Network.HostName (getHostName)
+
+-- lens
+import Control.Lens
 
 -- mtl
 import Control.Monad.Except
@@ -37,6 +45,9 @@ import Path
 
 -- process
 import System.Process (shell, readCreateProcessWithExitCode)
+
+-- safe
+import Safe
 
 -- text
 import Data.Text (Text)
@@ -136,11 +147,18 @@ rawBuiltinEvaluators =
       , evalFILE
       , evalEXT
       , evalFFILE
+      , evalHOST
+      , evalGUARD
+      , evalCLASS
+      , evalMACROCLASS
+      , evalCAMELCLASS
       , unsupported (Var "MAIL") "E-mail address of the current user."
       , unsupported (Var "USER") "Name of the currently logged-in user."
         -- TODO: should get user full name from system (with fall back on the login name)
+        --       (look at module @System.Posix.User@ in package `unix`)
+      , unsupported (Var "LICENSE") "Not yet implemented."
       {-
-      , (Var "HASKELLRESOLVER", Evaluator testEvaluator)
+      , (Var "HASKELLRESOLVER", Evaluator testEvaluator)  -- TODO: implement this!
       , (Var "HASKELLMODULE", Evaluator testEvaluator2) -}
       ]
 
@@ -152,34 +170,6 @@ unsupported var@(Var varName) shortDesc = mkEvalInfo var description action
       throwError @_ @_ @Void
         ("no built-in support for variable %" <> Text.unpack varName <> "%, "
          <> "please assign its value in the configuration file.")
-
-{- TODO:
-`%LICENSE%`
-Tries to determine the project's license it the following order:
-1. Using `licensee` if installed. This can be disabled by
-setting the `g:templates_use_licensee` variable to `0`.
-2. Using the `g:license` variable.
-3. If all else fails: Default to `MIT`.
-
-`%HOST%`
-Current host name.
-
-`%GUARD%`
-A string containing only alphanumeric characters, and
-underscores, suitable to be used as preprocessor guards
-for C/C++/Objective-C header file.
-
-`%CLASS%`
-File name, without extension, and the first character of
-each word capitalised. This is typically used for Java/C++
-class names.
-`%MACROCLASS%`
-File name, without extension, in all-capitals.
-
-`%CAMELCLASS%`
-File name, without extension, with the first character of
-every word capitalised, and underscores removed.
--}
 
 -- | The current local time in the given format.
 -- See @Data.Time.Format@ for a description of the format string syntax.
@@ -222,23 +212,68 @@ evalFILE :: MonadEvaluator m => EvaluatorInfo m
 evalFILE = mkEvalInfo (Var "FILE") description action
   where
     description = "File name, without extension."
-    action = do
-      name <- asks (filename . ctxTarget)
-      case setFileExtension "" name of
-        Left e -> throwError ("evalFILE: " <> show e)
-        Right basename -> pure basename
+    action = asks ctxTarget >>= getRootName
+
+getRootName :: MonadError String m => Path b File -> m (Path Rel File)
+getRootName path =
+  case setFileExtension "" (filename path) of
+    Left e -> throwError ("evalFILE: " <> show e)
+    Right rootName -> pure rootName
 
 evalEXT :: MonadEvaluator m => EvaluatorInfo m
 evalEXT = mkEvalInfo (Var "EXT") description action
   where
-    description = "File extension (component after the last period)."
-    action = asks (fileExtension . ctxTarget)
+    description = "File extension (component after the last dot)."
+    action = asks (tailSafe . fileExtension . ctxTarget)
+    -- NOTE: fileExtension returns the extension including the dot (e.g., ".txt")
 
 evalFFILE :: MonadEvaluator m => EvaluatorInfo m
 evalFFILE = mkEvalInfo (Var "FFILE") description action
   where
     description = "File name, with extension. This is equivalent to expanding `%FILE%.%EXT%`."
     action = asks (filename . ctxTarget)
+
+evalHOST :: MonadEvaluator m => EvaluatorInfo m
+evalHOST = mkEvalInfo (Var "HOST") description action
+  where
+    description = "Current host name."
+    action = liftIO getHostName
+
+evalGUARD :: MonadEvaluator m => EvaluatorInfo m
+evalGUARD = mkEvalInfo (Var "GUARD") description action
+  where
+    description = "A string suitable to be used as preprocessor guards for C or C++ header files."
+    action = do
+      let cleanChar c | isAlphaNum c = c
+                      | otherwise    = '_'
+      name <- asks (map cleanChar . toFilePath . filename . ctxTarget)
+      Text.toUpper <$> toText name
+
+run :: MonadEvaluator m => EvaluatorInfo m -> ReaderT Ctx m Text
+run (eiAction -> EvaluatorAction action) = action >>= toText
+
+evalCLASS :: MonadEvaluator m => EvaluatorInfo m
+evalCLASS = mkEvalInfo (Var "CLASS") description action
+  where
+    description = "File name without extension, and the first character of each word capitalised."
+    action = do
+      rootName <- run evalFILE
+      let groups = Text.groupBy ((==) `on` isAlpha) rootName
+          capitalisedGroups = groups & each._head %~ toUpper
+      return (Text.concat capitalisedGroups)
+
+evalMACROCLASS :: MonadEvaluator m => EvaluatorInfo m
+evalMACROCLASS = mkEvalInfo (Var "MACROCLASS") description action
+  where
+    description = "File name without extension, in upper case."
+    action = Text.toUpper <$> run evalFILE
+
+evalCAMELCLASS :: MonadEvaluator m => EvaluatorInfo m
+evalCAMELCLASS = mkEvalInfo (Var "CAMELCLASS") description action
+  where
+    description = "File name without extension, the first character of each work capitalised, "
+                  <> "and underscores removed."
+    action = Text.replace "_" "" <$> run evalCLASS
 
 -- | @constEvaluator x@ always evaluates to `x`.
 constEvaluator :: Monad m => Text -> Evaluator m
