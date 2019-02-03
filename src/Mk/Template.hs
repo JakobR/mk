@@ -6,6 +6,7 @@ module Mk.Template
   , Chunk(..)
   , Template(..)
   , Pos(..)
+  , initialPos
   , renderTemplate
   ) where
 

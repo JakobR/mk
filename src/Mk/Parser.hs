@@ -66,5 +66,5 @@ parseTemplate
   -> Text            -- ^ text to parse
   -> m Template
 parseTemplate srcName =
-  parseTemplate' (initialPos $ fromMaybe "<string>" srcName)
+  parseTemplate' (Text.Megaparsec.initialPos $ fromMaybe "<string>" srcName)
 {-# INLINABLE parseTemplate #-}

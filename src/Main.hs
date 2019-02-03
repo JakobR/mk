@@ -11,9 +11,6 @@ import Data.List (isPrefixOf)
 import System.Exit
 import System.IO
 
--- containers
-import qualified Data.Set as Set
-
 -- extra
 import Data.List.Extra (replace)
 
@@ -29,6 +26,9 @@ import Path
 
 -- path-io
 import qualified Path.IO
+
+-- safe
+import Safe.Foldable
 
 -- text
 import qualified Data.Text.IO as Text.IO
@@ -52,7 +52,7 @@ main = do
   result <- runReaderT (runExceptT main') cfg
   case result of
     Left err -> die $ "Error: " ++ err
-    Right x -> pure x
+    Right () -> pure ()
 
 
 main' :: (MonadReader Config m, MonadError String m, MonadIO m) => m ()
@@ -95,9 +95,9 @@ main' = do
       -- For vim mode, only output the first cursor position so
       -- we can just pass the output directly to vim as command-line argument.
       -- (usually a template will only have one cursor position anyways.)
-      case Set.toAscList cursorPositions of
-        (p:_) -> putCursorVim p
-        _ -> return ()
+      -- If no position is specified in the template, we will output position (0, 0);
+      -- this way we don't have to check if the result is empty before passing it to vim.
+      putCursorVim (minimumDef initialPos cursorPositions)
     CursorPosNone ->
       return ()
 
@@ -122,7 +122,10 @@ putCursorLn Pos{..} = liftIO $ do
 -- (via https://stackoverflow.com/a/3313469)
 putCursorVim :: MonadIO m => Pos -> m ()
 putCursorVim Pos{..} = liftIO $
-  putStr ("+call cursor(" <> show posRow <> ", " <> show posCol <> ")")
+  -- Note that line/column are one-based in vim
+  let row = posRow + 1
+      col = posCol + 1
+  in putStr ("+call cursor(" <> show row <> ", " <> show col <> ")")
 
 
 whenVerbose :: MonadReader Config m => m () -> m ()
