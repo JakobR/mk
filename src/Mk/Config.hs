@@ -241,7 +241,7 @@ optionsParser defaultConfigFile =
       option (maybeReader readCursorPos) $
       short 'p'
       <> long "cursor-pos"
-      <> value CursorPosAll
+      <> value CursorPosNone
       <> showDefaultWith showCursorPos
       <> helpDoc (Just cursorPosHelp)
 
