@@ -1,0 +1,94 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
+
+module Mk.Evaluators.Haskell
+  ( evalHASKELLRESOLVER
+  , evalHASKELLMODULE
+  ) where
+
+-- base
+import Control.Monad.IO.Class
+import Data.Char (isUpper)
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
+
+-- filepath
+import System.FilePath (dropTrailingPathSeparator)
+
+-- lens
+import Control.Lens
+
+-- lens-aeson
+import Data.Aeson.Lens (key, _String)
+
+-- mtl
+import Control.Monad.Reader
+
+-- path
+import Path
+
+-- path-io
+import Path.IO
+
+-- yaml
+import Data.Yaml (decodeFileThrow, Value(..))
+
+-- mk
+import Mk.Evaluators.Filename (getRootName)
+import Mk.Evaluators.Types
+
+
+evalHASKELLRESOLVER :: MonadEvaluator m => EvaluatorInfo m
+evalHASKELLRESOLVER = mkEvalInfo (Var "HASKELLRESOLVER") description action
+  where
+    description = "Current stackage resolver, see https://www.stackage.org/"
+    action = do
+      targetDir <- parent <$> asks ctxTarget
+      findStackConf targetDir >>= \case
+        Nothing ->
+          -- Unable to find stack.conf, so let the user fill out the value.
+          return "TODO"
+        Just stackConf -> do
+          conf :: Value <- decodeFileThrow (toFilePath stackConf)
+          return $ fromMaybe "TODO" (conf ^? key "resolver" . _String)
+{-# INLINABLE evalHASKELLRESOLVER #-}
+
+findStackConf :: MonadIO m => Path Abs Dir -> m (Maybe (Path Abs File))
+findStackConf dir = do
+  let stackConf = dir </> [relfile|stack.yaml|]
+  doesFileExist stackConf >>= \case
+    True -> return (Just stackConf)
+    False | parent dir /= dir -> findStackConf (parent dir)
+          | otherwise -> do
+              homeDir <- getHomeDir
+              let globalStackConf = homeDir </> [relfile|.stack/global-project/stack.yaml|]
+              doesFileExist globalStackConf >>= \case
+                True -> return (Just globalStackConf)
+                False -> return Nothing
+
+evalHASKELLMODULE :: MonadEvaluator m => EvaluatorInfo m
+evalHASKELLMODULE = mkEvalInfo (Var "HASKELLMODULE") description action
+  where
+    description = "Haskell module name."
+    action = do
+      -- Example: path "/bla/bla/project/src/Blah/Blup/Blop.hs" => module name "Blah.Blup.Blop"
+      -- Algorithm: include all parent directories whose names start with an upper-case character.
+      target <- asks ctxTarget
+      targetRootName <- getRootName target
+      let components = moduleDirs (parent target)
+                       ++ [toFilePath targetRootName]
+      return (intercalate "." components)
+
+    moduleDirs :: Path Abs Dir -> [String]
+    moduleDirs = go []
+      where
+        go !xs dir =
+          case toFilePath (dirname dir) of
+            h:_ | isUpper h -> let component = dropTrailingPathSeparator . toFilePath . dirname $ dir
+                               in go (component : xs) (parent dir)
+            _ -> xs
+{-# INLINABLE evalHASKELLMODULE #-}

@@ -26,6 +26,12 @@ executable mk
   other-modules:    Mk.Config
                   , Mk.Config.Prop
                   , Mk.Evaluators
+                  , Mk.Evaluators.Config
+                  , Mk.Evaluators.Filename
+                  , Mk.Evaluators.Haskell
+                  , Mk.Evaluators.System
+                  , Mk.Evaluators.Time
+                  , Mk.Evaluators.Types
                   , Mk.Parser
                   , Mk.Template
                   , Mk.Util.StaticAssert
