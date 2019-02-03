@@ -1,11 +1,13 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -22,6 +24,7 @@ import Control.Exception
 import Control.Monad.IO.Class
 import Data.Char
 import Data.Function (on)
+import Data.Maybe (fromMaybe)
 import Data.Void
 import System.Environment.Blank
 import System.Exit
@@ -36,12 +39,18 @@ import Network.HostName (getHostName)
 -- lens
 import Control.Lens
 
+-- lens-aeson
+import Data.Aeson.Lens (key, _String)
+
 -- mtl
 import Control.Monad.Except
 import Control.Monad.Reader
 
 -- path
 import Path
+
+-- path-io
+import Path.IO
 
 -- process
 import System.Process (shell, readCreateProcessWithExitCode)
@@ -59,6 +68,9 @@ import Data.Time.LocalTime
 
 -- unix
 import System.Posix.User (getRealUserID, UserEntry(..), getUserEntryForID)
+
+-- yaml
+import Data.Yaml (decodeFileThrow, Value(..))
 
 -- mk
 import Mk.Template
@@ -151,15 +163,15 @@ rawBuiltinEvaluators =
       , evalEXT
       , evalFFILE
       , evalHOST
+      , evalUSER
       , evalGUARD
       , evalCLASS
       , evalMACROCLASS
       , evalCAMELCLASS
+      , evalHASKELLRESOLVER
       , unsupported (Var "MAIL") "E-mail address of the current user."
-      , evalUSER
-      , unsupported (Var "LICENSE") "Not yet implemented."
+      , unsupported (Var "LICENSE") "Abbreviation of the project's license, e.g. \"MIT\"."
       {-
-      , (Var "HASKELLRESOLVER", Evaluator testEvaluator)  -- TODO: implement this!
       , (Var "HASKELLMODULE", Evaluator testEvaluator2) -}
       ]
 
@@ -286,6 +298,34 @@ evalCAMELCLASS = mkEvalInfo (Var "CAMELCLASS") description action
                   <> "and underscores removed."
     action = Text.replace "_" "" <$> run evalCLASS
 
+evalHASKELLRESOLVER :: MonadEvaluator m => EvaluatorInfo m
+evalHASKELLRESOLVER = mkEvalInfo (Var "HASKELLRESOLVER") description action
+  where
+    description = "Current stackage resolver, see https://www.stackage.org/"
+    action = do
+      targetDir <- parent <$> asks ctxTarget
+      findStackConf targetDir >>= \case
+        Nothing ->
+          -- Unable to find stack.conf, so let the user fill out the value.
+          return "TODO"
+        Just stackConf -> do
+          conf :: Value <- decodeFileThrow (toFilePath stackConf)
+          return $ fromMaybe "TODO" (conf ^? key "resolver" . _String)
+
+findStackConf :: MonadIO m => Path Abs Dir -> m (Maybe (Path Abs File))
+findStackConf dir = do
+  let stackConf = dir </> [relfile|stack.yaml|]
+  doesFileExist stackConf >>= \case
+    True -> return (Just stackConf)
+    False | parent dir /= dir -> findStackConf (parent dir)
+          | otherwise -> do
+              homeDir <- getHomeDir
+              let globalStackConf = homeDir </> [relfile|.stack/global-project/stack.yaml|]
+              doesFileExist globalStackConf >>= \case
+                True -> return (Just globalStackConf)
+                False -> return Nothing
+
+
 -- | @constEvaluator x@ always evaluates to `x`.
 constEvaluator :: Monad m => Text -> Evaluator m
 constEvaluator txt = Evaluator "Returns a constant value." (pure txt)
@@ -310,7 +350,7 @@ commandEvaluator target (Text.unpack -> cmd) =
 {-# INLINABLE commandEvaluator #-}
 
 maskEnv :: String -> String -> IO a -> IO a
-maskEnv key tempValue action = do
-  oldValue <- getEnv key
-  finally (setEnv key tempValue True >> action)
-          (maybe (unsetEnv key) (\v -> setEnv key v True) oldValue)
+maskEnv name tempValue action = do
+  oldValue <- getEnv name
+  finally (setEnv name tempValue True >> action)
+          (maybe (unsetEnv name) (\v -> setEnv name v True) oldValue)
