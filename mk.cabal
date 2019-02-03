@@ -48,5 +48,6 @@ executable mk
                   , text
                   , time
                   , transformers
+                  , unix
   hs-source-dirs:   src
   default-language: Haskell2010

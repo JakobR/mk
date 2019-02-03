@@ -57,6 +57,9 @@ import qualified Data.Text as Text
 import Data.Time.Format
 import Data.Time.LocalTime
 
+-- unix
+import System.Posix.User (getRealUserID, UserEntry(..), getUserEntryForID)
+
 -- mk
 import Mk.Template
 
@@ -153,9 +156,7 @@ rawBuiltinEvaluators =
       , evalMACROCLASS
       , evalCAMELCLASS
       , unsupported (Var "MAIL") "E-mail address of the current user."
-      , unsupported (Var "USER") "Name of the currently logged-in user."
-        -- TODO: should get user full name from system (with fall back on the login name)
-        --       (look at module @System.Posix.User@ in package `unix`)
+      , evalUSER
       , unsupported (Var "LICENSE") "Not yet implemented."
       {-
       , (Var "HASKELLRESOLVER", Evaluator testEvaluator)  -- TODO: implement this!
@@ -238,6 +239,16 @@ evalHOST = mkEvalInfo (Var "HOST") description action
   where
     description = "Current host name."
     action = liftIO getHostName
+
+evalUSER :: MonadEvaluator m => EvaluatorInfo m
+evalUSER = mkEvalInfo (Var "USER") description action
+  where
+    description = "Name of the currently logged-in user."
+    action = liftIO $ do
+      uid <- getRealUserID
+      UserEntry{..} <- getUserEntryForID uid
+      return (if not (isEmpty userGecos) then userGecos else userName)
+    isEmpty = all isSpace
 
 evalGUARD :: MonadEvaluator m => EvaluatorInfo m
 evalGUARD = mkEvalInfo (Var "GUARD") description action
