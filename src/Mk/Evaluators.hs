@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -24,6 +25,7 @@ import Control.Exception
 import Control.Monad.IO.Class
 import Data.Char
 import Data.Function (on)
+import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Void
 import System.Environment.Blank
@@ -32,6 +34,9 @@ import System.Exit
 -- containers
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+
+-- filepath
+import System.FilePath (dropTrailingPathSeparator)
 
 -- hostname
 import Network.HostName (getHostName)
@@ -169,10 +174,9 @@ rawBuiltinEvaluators =
       , evalMACROCLASS
       , evalCAMELCLASS
       , evalHASKELLRESOLVER
+      , evalHASKELLMODULE
       , unsupported (Var "MAIL") "E-mail address of the current user."
       , unsupported (Var "LICENSE") "Abbreviation of the project's license, e.g. \"MIT\"."
-      {-
-      , (Var "HASKELLMODULE", Evaluator testEvaluator2) -}
       ]
 
 unsupported :: forall m. MonadEvaluator m => Var -> Text -> EvaluatorInfo m
@@ -230,7 +234,7 @@ evalFILE = mkEvalInfo (Var "FILE") description action
 getRootName :: MonadError String m => Path b File -> m (Path Rel File)
 getRootName path =
   case setFileExtension "" (filename path) of
-    Left e -> throwError ("evalFILE: " <> show e)
+    Left e -> throwError ("getRootName: " <> show e)
     Right rootName -> pure rootName
 
 evalEXT :: MonadEvaluator m => EvaluatorInfo m
@@ -325,6 +329,27 @@ findStackConf dir = do
                 True -> return (Just globalStackConf)
                 False -> return Nothing
 
+evalHASKELLMODULE :: MonadEvaluator m => EvaluatorInfo m
+evalHASKELLMODULE = mkEvalInfo (Var "HASKELLMODULE") description action
+  where
+    description = "Haskell module name."
+    action = do
+      -- Example: path "/bla/bla/project/src/Blah/Blup/Blop.hs" => module name "Blah.Blup.Blop"
+      -- Algorithm: include all parent directories whose names start with an upper-case character.
+      target <- asks ctxTarget
+      targetRootName <- getRootName target
+      let components = moduleDirs (parent target)
+                       ++ [toFilePath targetRootName]
+      return (intercalate "." components)
+
+    moduleDirs :: Path Abs Dir -> [String]
+    moduleDirs = go []
+      where
+        go !xs dir =
+          case toFilePath (dirname dir) of
+            h:_ | isUpper h -> let component = dropTrailingPathSeparator . toFilePath . dirname $ dir
+                               in go (component : xs) (parent dir)
+            _ -> xs
 
 -- | @constEvaluator x@ always evaluates to `x`.
 constEvaluator :: Monad m => Text -> Evaluator m
