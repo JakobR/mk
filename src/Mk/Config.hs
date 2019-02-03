@@ -13,7 +13,9 @@
 module Mk.Config
   ( Config(..)
   , VarValue(..)
+  , CursorPosFormat(..)
   , loadConfig
+  , readShowCursorPos_prop
   ) where
 
 -- base
@@ -21,7 +23,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Char (toLower)
 import Data.Foldable
-import Data.List (isPrefixOf)
+import Data.List (intercalate, isPrefixOf)
 import Data.Maybe
 import System.IO (hPutStrLn, stderr)
 
@@ -39,6 +41,7 @@ import qualified System.FilePath as FilePath
 
 -- optparse-applicative
 import Options.Applicative
+import qualified Options.Applicative.Help.Pretty as Doc
 
 -- path
 import Path
@@ -62,7 +65,7 @@ data Config = Config
   , cfgTemplate :: Maybe (Path Abs File)
   , cfgForce :: Bool
   , cfgVerbose :: Bool
-  , cfgQuiet :: Bool
+  , cfgCursorPos :: CursorPosFormat
   , cfgTarget :: Path Abs File
   }
   deriving Show
@@ -74,6 +77,13 @@ data VarValue
   deriving Show
 
 
+data CursorPosFormat
+  = CursorPosAll
+  | CursorPosNone
+  | CursorPosVim
+  deriving (Eq, Enum, Bounded, Show)
+
+
 -- TODO: Add an option to view descriptions of variables (should also list variables from config-file).
 -- | Command-line options.
 data UnresolvedOptions = UnresolvedOptions
@@ -81,7 +91,7 @@ data UnresolvedOptions = UnresolvedOptions
   , optTemplate :: Maybe FilePath
   , optForce :: Bool
   , optVerbose :: Bool
-  , optQuiet :: Bool
+  , optCursorPos :: CursorPosFormat
   , optTarget :: FilePath
   }
 
@@ -162,7 +172,7 @@ resolveConfig UnresolvedConfigFile{..} UnresolvedOptions{..} = do
                , cfgTemplate = resolvedTemplate
                , cfgForce = optForce
                , cfgVerbose = optVerbose
-               , cfgQuiet = optQuiet
+               , cfgCursorPos = optCursorPos
                , cfgTarget = resolvedTarget
                }
 
@@ -188,7 +198,7 @@ optionsParser defaultConfigFile =
   <*> optional template
   <*> forceFlag
   <*> verboseFlag
-  <*> quietFlag
+  <*> cursorPos
   <*> target
 
   where
@@ -227,11 +237,41 @@ optionsParser defaultConfigFile =
       <> long "verbose"
       <> help "More output on stderr (mostly for debugging)"
 
-    quietFlag =
-      switch $
-      short 'q'
-      <> long "quiet"
-      <> help "Less output on stdout, in particular the cursor positions will not be printed."
+    cursorPos =
+      option (maybeReader readCursorPos) $
+      short 'p'
+      <> long "cursor-pos"
+      <> value CursorPosAll
+      <> showDefaultWith showCursorPos
+      <> helpDoc (Just cursorPosHelp)
+
+    cursorPosHelp = Doc.vsep
+      [ paragraph ("Control how the initial cursor position indicated in the template is "
+                   ++ "printed to standard output.")
+      , Doc.text ("(values: " ++ cursorPosValues ++ ")")
+      ]
+
+    cursorPosValues = intercalate ", " $ showCursorPos <$> [minBound..maxBound]
+
+    paragraph :: String -> Doc.Doc
+    paragraph = foldr (Doc.</>) mempty . map Doc.string . words
+
+
+readShowCursorPos_prop :: Bool
+readShowCursorPos_prop = all (\x -> Just x == readCursorPos (showCursorPos x)) [minBound..maxBound]
+
+
+showCursorPos :: CursorPosFormat -> String
+showCursorPos CursorPosAll = "all"
+showCursorPos CursorPosNone = "none"
+showCursorPos CursorPosVim = "vim"
+
+
+readCursorPos :: String -> Maybe CursorPosFormat
+readCursorPos "all" = Just CursorPosAll
+readCursorPos "none" = Just CursorPosNone
+readCursorPos "vim" = Just CursorPosVim
+readCursorPos _ = Nothing
 
 
 optionsParserInfo :: Path Abs File -> ParserInfo UnresolvedOptions

@@ -11,6 +11,9 @@ import Data.List (isPrefixOf)
 import System.Exit
 import System.IO
 
+-- containers
+import qualified Data.Set as Set
+
 -- extra
 import Data.List.Extra (replace)
 
@@ -85,12 +88,24 @@ main' = do
   Path.IO.ensureDir (parent cfgTarget)
   liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
 
-  unless cfgQuiet $
-    forM_ cursorPositions putCursorLn
+  case cfgCursorPos of
+    CursorPosAll ->
+      forM_ cursorPositions putCursorLn
+    CursorPosVim ->
+      -- For vim mode, only output the first cursor position so
+      -- we can just pass the output directly to vim as command-line argument.
+      -- (usually a template will only have one cursor position anyways.)
+      case Set.toAscList cursorPositions of
+        (p:_) -> putCursorVim p
+        _ -> return ()
+    CursorPosNone ->
+      return ()
+
 
 evalVarValue :: (MonadError String m, MonadIO m) => Path Abs File -> VarValue -> Evaluator m
 evalVarValue _ (VarConst txt) = constEvaluator txt
 evalVarValue target (VarCommand cmd) = commandEvaluator target cmd
+
 
 -- | Prints the given position in the format "<abs>:<row>:<col>".
 putCursorLn :: MonadIO m => Pos -> m ()
@@ -100,6 +115,14 @@ putCursorLn Pos{..} = liftIO $ do
   putStr (show posRow)
   putChar ':'
   putStrLn (show posCol)
+
+
+-- | Intended use is as a command line argument to vim:
+--   vim "+call cursor(<LINE>, <COLUMN>)" <FILE>
+-- (via https://stackoverflow.com/a/3313469)
+putCursorVim :: MonadIO m => Pos -> m ()
+putCursorVim Pos{..} = liftIO $
+  putStr ("+call cursor(" <> show posRow <> ", " <> show posCol <> ")")
 
 
 whenVerbose :: MonadReader Config m => m () -> m ()

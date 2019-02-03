@@ -24,9 +24,11 @@ executable mk
   import:           warnings
   main-is:          Main.hs
   other-modules:    Mk.Config
+                  , Mk.Config.Prop
                   , Mk.Evaluators
                   , Mk.Parser
                   , Mk.Template
+                  , Mk.Util.StaticAssert
   build-depends:    base >=4.12 && <5
                   , containers
                   , dhall
@@ -42,6 +44,7 @@ executable mk
                   , path-io
                   , process
                   , safe
+                  , template-haskell
                   , text
                   , time
                   , transformers
