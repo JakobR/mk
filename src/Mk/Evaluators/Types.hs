@@ -43,6 +43,8 @@ data Ctx = Ctx
   }
 
 
+-- TODO: include some kind of MonadLogger here, so we can log debug info from the evaluators
+-- (should only be displayed when "--verbose" is set)
 type MonadEvaluator m = (MonadError String m, MonadIO m)
 
 

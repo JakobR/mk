@@ -66,6 +66,7 @@ data Config = Config
   , cfgForce :: Bool
   , cfgVerbose :: Bool
   , cfgCursorPos :: CursorPosFormat
+  , cfgWriteToStdout :: Bool
   , cfgTarget :: Path Abs File
   }
   deriving Show
@@ -92,6 +93,7 @@ data UnresolvedOptions = UnresolvedOptions
   , optForce :: Bool
   , optVerbose :: Bool
   , optCursorPos :: CursorPosFormat
+  , optWriteToStdout :: Bool
   , optTarget :: FilePath
   }
 
@@ -173,6 +175,7 @@ resolveConfig UnresolvedConfigFile{..} UnresolvedOptions{..} = do
                , cfgForce = optForce
                , cfgVerbose = optVerbose
                , cfgCursorPos = optCursorPos
+               , cfgWriteToStdout = optWriteToStdout
                , cfgTarget = resolvedTarget
                }
 
@@ -199,6 +202,7 @@ optionsParser defaultConfigFile =
   <*> forceFlag
   <*> verboseFlag
   <*> cursorPos
+  <*> writeToStdoutFlag
   <*> target
 
   where
@@ -236,6 +240,12 @@ optionsParser defaultConfigFile =
       short 'v'
       <> long "verbose"
       <> help "More output on stderr (mostly for debugging)"
+
+    writeToStdoutFlag =
+      switch $
+      long "write-to-stdout"
+      <> help ("Write output to stdout instead of TARGET. Note that TARGET is still "
+               ++ "required for template matching and variable evaluation.")
 
     cursorPos =
       option (maybeReader readCursorPos) $

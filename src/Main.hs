@@ -80,13 +80,18 @@ main' = do
   putVerboseLn $ "Rendered template: " <> show renderedTemplate
   putVerboseLn $ "Cursor positions: " <> show cursorPositions
 
-  -- Write target file
-  unless cfgForce $ do
-    targetExists <- Path.IO.doesFileExist cfgTarget
-    when targetExists $
-      throwError "Target file already exists. Pass the option --force to overwrite it anyways."
-  Path.IO.ensureDir (parent cfgTarget)
-  liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
+  -- Write rendered template
+  case cfgWriteToStdout of
+    True -> do
+      putVerboseLn ""  -- blank line for some visual separation on the terminal
+      liftIO $ Text.Lazy.IO.putStr renderedTemplate
+    False -> do
+      unless cfgForce $ do
+        targetExists <- Path.IO.doesFileExist cfgTarget
+        when targetExists $
+          throwError "Target file already exists. Pass the option --force to overwrite it anyways."
+      Path.IO.ensureDir (parent cfgTarget)
+      liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
 
   case cfgCursorPos of
     CursorPosAll ->
