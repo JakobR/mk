@@ -14,7 +14,6 @@ module Mk.Evaluators.Haskell
 import Control.Monad.IO.Class
 import Data.Char (isUpper)
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
 
 -- filepath
 import System.FilePath (dropTrailingPathSeparator)
@@ -34,6 +33,9 @@ import Path
 -- path-io
 import Path.IO
 
+-- transformers
+import Control.Monad.Trans.Maybe
+
 -- yaml
 import Data.Yaml (decodeFileThrow, Value(..))
 
@@ -48,27 +50,40 @@ evalHASKELLRESOLVER = mkEvalInfo (Var "HASKELLRESOLVER") description action
     description = "Current stackage resolver, see https://www.stackage.org/"
     action = do
       targetDir <- parent <$> asks ctxTarget
-      findStackConf targetDir >>= \case
+      confMay <- runMaybeT $ findStackConf targetDir >>= readStackConf
+      case confMay ^? _Just . key "resolver" . _String of
         Nothing ->
-          -- Unable to find stack.conf, so let the user fill out the value.
+          -- Unable to find stack.conf or resolver value, so let the user fill out the value.
           return "TODO"
-        Just stackConf -> do
-          conf :: Value <- decodeFileThrow (toFilePath stackConf)
-          return $ fromMaybe "TODO" (conf ^? key "resolver" . _String)
+        Just resolver ->
+          return resolver
 {-# INLINABLE evalHASKELLRESOLVER #-}
 
-findStackConf :: MonadIO m => Path Abs Dir -> m (Maybe (Path Abs File))
-findStackConf dir = do
+
+readStackConf :: MonadIO m => Path Abs File -> m Value
+readStackConf path = decodeFileThrow (toFilePath path)
+
+
+findStackConf :: MonadIO m => Path Abs Dir -> MaybeT m (Path Abs File)
+findStackConf dir = MaybeT $ do
+  -- It should be possible to create files via symbolic links pointing to a project subdirectory
+  canonicalDir <- canonicalizePath dir
+  findStackConf' canonicalDir
+
+
+findStackConf' :: MonadIO m => Path Abs Dir -> m (Maybe (Path Abs File))
+findStackConf' dir = do
   let stackConf = dir </> [relfile|stack.yaml|]
   doesFileExist stackConf >>= \case
     True -> return (Just stackConf)
-    False | parent dir /= dir -> findStackConf (parent dir)
+    False | parent dir /= dir -> findStackConf' (parent dir)
           | otherwise -> do
               homeDir <- getHomeDir
               let globalStackConf = homeDir </> [relfile|.stack/global-project/stack.yaml|]
               doesFileExist globalStackConf >>= \case
                 True -> return (Just globalStackConf)
                 False -> return Nothing
+
 
 evalHASKELLMODULE :: MonadEvaluator m => EvaluatorInfo m
 evalHASKELLMODULE = mkEvalInfo (Var "HASKELLMODULE") description action
