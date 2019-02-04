@@ -7,4 +7,4 @@ import Mk.Config (readShowCursorPos_prop)
 import Mk.Util.StaticAssert (staticAssert)
 
 
-$(staticAssert readShowCursorPos_prop "Property Mk.Config.readShowCursorPos_prop failed!")
+$(staticAssert readShowCursorPos_prop "property Mk.Config.readShowCursorPos_prop failed!")

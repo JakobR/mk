@@ -49,9 +49,6 @@ type MonadEvaluator m = (MonadError String m, MonadIO m)
 data EvaluatorAction m = forall a. EvaluatorResult a => EvaluatorAction !(ReaderT Ctx m a)
 
 
--- TODO:
--- The intended variable name could be a phantom type parameter!
--- Then it should be possible to exclude duplicates at compile time.
 data EvaluatorInfo m = EvaluatorInfo
   { eiIntendedVar :: !Var
   , eiDescription :: !Text

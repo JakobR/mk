@@ -29,6 +29,7 @@ executable mk
                   , Mk.Evaluators.Config
                   , Mk.Evaluators.Filename
                   , Mk.Evaluators.Haskell
+                  , Mk.Evaluators.Prop
                   , Mk.Evaluators.System
                   , Mk.Evaluators.Time
                   , Mk.Evaluators.Types

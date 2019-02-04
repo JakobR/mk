@@ -10,12 +10,14 @@ module Mk.Evaluators
   , builtinEvaluators
   , constEvaluator
   , commandEvaluator
+  , rawBuiltinEvaluators_uniqueVars_prop
   ) where
 
 -- base
 import Data.Void
 
 -- containers
+import qualified Data.Set as Set
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 
@@ -57,9 +59,6 @@ builtinEvaluators target = Map.fromList $ runWithCtx <$> rawBuiltinEvaluators
 {-# INLINABLE builtinEvaluators #-}
 
 
--- TODO:
--- Assert that there are no duplicate variable names in the builtin evaluators!
--- (this could happen if I make a copy&paste error and forget to change the variable name)
 rawBuiltinEvaluators
   :: forall m. MonadEvaluator m
   => [EvaluatorInfo m]
@@ -84,6 +83,12 @@ rawBuiltinEvaluators =
       , unsupported (Var "MAIL") "E-mail address of the current user."
       , unsupported (Var "LICENSE") "Abbreviation of the project's license, e.g. \"MIT\"."
       ]
+
+
+rawBuiltinEvaluators_uniqueVars_prop :: Bool
+rawBuiltinEvaluators_uniqueVars_prop =
+  let vars = eiIntendedVar <$> rawBuiltinEvaluators @(ExceptT String IO)
+  in Set.size (Set.fromList vars) == length vars
 
 
 unsupported :: forall m. MonadEvaluator m => Var -> Text -> EvaluatorInfo m
