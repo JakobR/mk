@@ -212,7 +212,7 @@ matches target template = do
 
     compileOptions =
       Glob.CompOptions{ Glob.characterClasses = False
-                      , Glob.characterRanges = False
+                      , Glob.characterRanges = True
                       , Glob.numberRanges = False
                       , Glob.wildcards = True
                       , Glob.recursiveWildcards = False
