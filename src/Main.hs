@@ -130,7 +130,7 @@ putCursorVim Pos{..} = liftIO $
   -- Note that line/column are one-based in vim
   let row = posRow + 1
       col = posCol + 1
-  in putStr ("+call cursor(" <> show row <> ", " <> show col <> ")")
+  in putStr ("call cursor(" <> show row <> ", " <> show col <> ")")
 
 
 whenVerbose :: MonadReader Config m => m () -> m ()
