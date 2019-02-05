@@ -108,6 +108,8 @@ main' = do
       -- If no position is specified in the template, we will output position (0, 0);
       -- this way we don't have to check if the result is empty before passing it to vim.
       putCursorVim firstCursorPos
+    CursorPosEmacs ->
+      putCursorEmacs firstCursorPos
 
 
 evalVarValue :: (MonadError String m, MonadIO m) => Path Abs File -> VarValue -> Evaluator m
@@ -134,6 +136,16 @@ putCursorVim Pos{..} = liftIO $
   let row = posRow + 1
       col = posCol + 1
   in putStr ("call cursor(" <> show row <> ", " <> show col <> ")")
+
+
+-- | Intended use is as a command line argument to emacsclient:
+--   emacsclient "+<LINE>:<COLUMN>" <FILE>
+putCursorEmacs :: MonadIO m => Pos -> m ()
+putCursorEmacs Pos{..} = liftIO $
+  -- Note that line/column are one-based in Emacs
+  let row = posRow + 1
+      col = posCol + 1
+  in putStr (show row <> ":" <> show col)
 
 
 whenVerbose :: MonadReader Config m => m () -> m ()

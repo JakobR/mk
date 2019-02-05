@@ -83,6 +83,7 @@ data CursorPosFormat
   | CursorPosOne
   | CursorPosAll
   | CursorPosVim
+  | CursorPosEmacs
   deriving (Eq, Enum, Bounded, Show)
 
 
@@ -277,6 +278,7 @@ showCursorPos CursorPosNone = "none"
 showCursorPos CursorPosOne = "one"
 showCursorPos CursorPosAll = "all"
 showCursorPos CursorPosVim = "vim"
+showCursorPos CursorPosEmacs = "emacs"
 
 
 readCursorPos :: String -> Maybe CursorPosFormat
@@ -284,6 +286,7 @@ readCursorPos "none" = Just CursorPosNone
 readCursorPos "one" = Just CursorPosOne
 readCursorPos "all" = Just CursorPosAll
 readCursorPos "vim" = Just CursorPosVim
+readCursorPos "emacs" = Just CursorPosEmacs
 readCursorPos _ = Nothing
 
 
