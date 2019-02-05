@@ -93,18 +93,21 @@ main' = do
       Path.IO.ensureDir (parent cfgTarget)
       liftIO $ Text.Lazy.IO.writeFile (toFilePath cfgTarget) renderedTemplate
 
+  let firstCursorPos = minimumDef initialPos cursorPositions
   case cfgCursorPos of
+    CursorPosNone ->
+      return ()
+    CursorPosOne ->
+      putCursorLn firstCursorPos
     CursorPosAll ->
-      forM_ cursorPositions putCursorLn
+      mapM_ putCursorLn cursorPositions
     CursorPosVim ->
       -- For vim mode, only output the first cursor position so
       -- we can just pass the output directly to vim as command-line argument.
       -- (usually a template will only have one cursor position anyways.)
       -- If no position is specified in the template, we will output position (0, 0);
       -- this way we don't have to check if the result is empty before passing it to vim.
-      putCursorVim (minimumDef initialPos cursorPositions)
-    CursorPosNone ->
-      return ()
+      putCursorVim firstCursorPos
 
 
 evalVarValue :: (MonadError String m, MonadIO m) => Path Abs File -> VarValue -> Evaluator m

@@ -79,8 +79,9 @@ data VarValue
 
 
 data CursorPosFormat
-  = CursorPosAll
-  | CursorPosNone
+  = CursorPosNone
+  | CursorPosOne
+  | CursorPosAll
   | CursorPosVim
   deriving (Eq, Enum, Bounded, Show)
 
@@ -272,14 +273,16 @@ readShowCursorPos_prop = all (\x -> Just x == readCursorPos (showCursorPos x)) [
 
 
 showCursorPos :: CursorPosFormat -> String
-showCursorPos CursorPosAll = "all"
 showCursorPos CursorPosNone = "none"
+showCursorPos CursorPosOne = "one"
+showCursorPos CursorPosAll = "all"
 showCursorPos CursorPosVim = "vim"
 
 
 readCursorPos :: String -> Maybe CursorPosFormat
-readCursorPos "all" = Just CursorPosAll
 readCursorPos "none" = Just CursorPosNone
+readCursorPos "one" = Just CursorPosOne
+readCursorPos "all" = Just CursorPosAll
 readCursorPos "vim" = Just CursorPosVim
 readCursorPos _ = Nothing
 
