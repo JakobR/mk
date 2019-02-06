@@ -12,7 +12,7 @@ module Mk.Evaluators.Haskell
 
 -- base
 import Control.Monad.IO.Class
-import Data.Char (isUpper)
+import Data.Char (isUpper, toUpper)
 import Data.List (intercalate)
 
 -- filepath
@@ -95,7 +95,7 @@ evalHASKELLMODULE = mkEvalInfo (Var "HASKELLMODULE") description action
       target <- asks ctxTarget
       targetRootName <- getRootName target
       let components = moduleDirs (parent target)
-                       ++ [toFilePath targetRootName]
+                       ++ [toFilePath targetRootName & _head %~ toUpper]
       return (intercalate "." components)
 
     moduleDirs :: Path Abs Dir -> [String]
