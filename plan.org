@@ -1,25 +1,8 @@
-Goal:
-      Be able to execute a command like ~mk path/to/file.hs~
-
-Function:
-      1. ~mkdir -p "path/to/"~
-      2. ~vim -ec "wq" -- "path/to/file.hs"~
-
-
 * Plan
-** Re-use the format from vim-template
-** Include my custom variables (now implemented in vimscript) directly into this program
-** Look at how vim-template is implemented w.r.t. vim-hooks, and integrate this program into vim instead
-** Integrate into emacs
+** TODO Allow project-local templates by searching the current directory and parent directories
+   - Recognize local template files by prefix =.template-=, i.e., local template files have names of the form ~.template-<PATTERN>~.
+   - Check vim-template docs how they do it, ideally we should be compatible (but only if their way isn't less powerful; compatibility isn't crucial)
+   - be sure to use the real path of the current directory (if we entered it via symlink)
+** TODO Integrate into emacs
 ** Later: maybe also allow templating of full project structure (like ~stack new~)
 *** This might require a separate command-line argument "template", since I can't just match the file extension
-** Also make shell aliases like ~mkm~ and ~mke~ which create the file and open it with ~m~ or ~e~ afterwards
-   #+BEGIN_SRC zsh
-   function mkm {
-       mk "$1" && m "$1"
-   }
-   function mkec {
-       mk "$1" && ec "$1"
-   }
-   #+END_SRC
-** Post it on the vim-template github page when done? maybe someone else there is interested in a standalone implementation.
