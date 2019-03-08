@@ -80,7 +80,7 @@ rawBuiltinEvaluators =
       , evalCAMELCLASS
       , evalHASKELLRESOLVER
       , evalHASKELLMODULE
-      , unsupported (Var "MAIL") "E-mail address of the current user."
+      , unsupported (Var "MAIL") "Email address of the current user."
       , unsupported (Var "LICENSE") "Abbreviation of the project's license, e.g. \"MIT\"."
       ]
 

@@ -1,4 +1,5 @@
 * Plan
+** TODO If the rendered output starts with "#!", make the target file executable (maybe add option "--no-chmod" to disable this)
 ** TODO Allow project-local templates by searching the current directory and parent directories
    - Recognize local template files by prefix =.template-=, i.e., local template files have names of the form ~.template-<PATTERN>~.
    - Check vim-template docs how they do it, ideally we should be compatible (but only if their way isn't less powerful; compatibility isn't crucial)
