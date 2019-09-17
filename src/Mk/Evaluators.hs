@@ -42,7 +42,7 @@ import Mk.Evaluators.Types
 
 -- | Built-in variable evaluators.
 --
--- We want to include at least those supported by `vim-template`.
+-- We want to include at least those supported by @vim-template@.
 -- See https://github.com/aperezdc/vim-template/blob/master/doc/template.txt
 builtinEvaluators
   :: forall m. MonadEvaluator m

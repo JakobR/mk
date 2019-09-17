@@ -20,7 +20,7 @@ import Data.Text (Text)
 import Data.Time.Format
 import Data.Time.LocalTime
 
---mk
+-- mk
 import Mk.Evaluators.Types
 
 
@@ -52,17 +52,17 @@ evalYEAR = evalLocalTimeWithFormat "%0Y" (Var "YEAR") description
 
 evalDATE :: MonadEvaluator m => EvaluatorInfo m
 evalDATE = evalLocalTimeWithFormat "%0Y-%m-%d" (Var "DATE") description
-  where description = "Current date in `YYYY-mm-dd` format. "
-                      <> "This is equivalent to expanding `%YEAR%-%MONTH%-%DAY%`."
+  where description = "Current date in 'YYYY-mm-dd' format. "
+                      <> "This is equivalent to expanding '%YEAR%-%MONTH%-%DAY%'."
 {-# INLINABLE evalDATE #-}
 
 evalTIME :: MonadEvaluator m => EvaluatorInfo m
 evalTIME = evalLocalTimeWithFormat "%H:%M" (Var "TIME") description
-  where description = "Current time in `HH:MM` format."
+  where description = "Current time in 'HH:MM' format."
 {-# INLINABLE evalTIME #-}
 
 evalFDATE :: MonadEvaluator m => EvaluatorInfo m
 evalFDATE = evalLocalTimeWithFormat "%0Y-%m-%d %H:%M" (Var "FDATE") description
-  where description = "Current full date (date and time) in `YYYY-mm-dd HH:MM` format. "
-                      <> "This is equivalent to expanding `%DATE% %TIME%`."
+  where description = "Current full date (date and time) in 'YYYY-mm-dd HH:MM' format. "
+                      <> "This is equivalent to expanding '%DATE% %TIME%'."
 {-# INLINABLE evalFDATE #-}

@@ -30,13 +30,14 @@ import qualified Data.Text as Text
 import Mk.Evaluators.Types
 
 
--- | @constEvaluator x@ always evaluates to `x`.
+-- | @'constEvaluator' x@ always evaluates to @x@.
 constEvaluator :: Monad m => Text -> Evaluator m
 constEvaluator txt = Evaluator "Returns a constant value." (pure txt)
 {-# INLINABLE constEvaluator #-}
 
--- | @commandEvaluator cmd@ executes the shell command `cmd` and returns its output.
--- The absolute path to the target file is available in the environment variable `MK_TARGET`.
+
+-- | @'commandEvaluator' target cmd@ executes the shell command @cmd@ and returns its output.
+-- The absolute path to the target file is available in the environment variable @MK_TARGET@.
 commandEvaluator :: MonadEvaluator m => Path Abs File -> Text -> Evaluator m
 commandEvaluator target (Text.unpack -> cmd) =
   Evaluator "Returns the standard output of a shell command" action

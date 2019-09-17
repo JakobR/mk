@@ -207,9 +207,9 @@ findTemplateInDir dir = do
 
 
 -- | Template file names are treated as glob-like patterns which target file name is matched against.
--- At the moment, only basic wildcards (`*` and `?`) are enabled.
+-- At the moment, only basic wildcards (@*@ and @?@) are enabled.
 --
--- For compatibility with vim-template, the string `=template=` acts like `*`.
+-- For compatibility with vim-template, the string @=template=@ acts like @*@.
 matches
   :: (MonadReader Config m, MonadError String m, MonadIO m)
   => Path Abs File  -- ^ target file path

@@ -61,7 +61,7 @@ evalEXT = mkEvalInfo (Var "EXT") description action
 evalFFILE :: MonadEvaluator m => EvaluatorInfo m
 evalFFILE = mkEvalInfo (Var "FFILE") description action
   where
-    description = "File name, with extension. This is equivalent to expanding `%FILE%.%EXT%`."
+    description = "File name, with extension. This is equivalent to expanding '%FILE%.%EXT%'."
     action = asks (filename . ctxTarget)
 {-# INLINABLE evalFFILE #-}
 
