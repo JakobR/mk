@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Mk.Evaluators.Config
   ( constEvaluator
@@ -8,13 +7,13 @@ module Mk.Evaluators.Config
   ) where
 
 -- base
-import Control.Exception
-import Control.Monad.IO.Class
-import System.Environment.Blank
-import System.Exit
+import Control.Exception (finally)
+import Control.Monad.IO.Class (liftIO)
+import System.Environment.Blank (getEnv, setEnv, unsetEnv)
+import System.Exit (ExitCode(ExitSuccess))
 
 -- mtl
-import Control.Monad.Except
+import Control.Monad.Except (throwError)
 
 -- path
 import Path
@@ -38,22 +37,32 @@ constEvaluator txt = Evaluator "Returns a constant value." (pure txt)
 
 -- | @'commandEvaluator' target cmd@ executes the shell command @cmd@ and returns its output.
 -- The absolute path to the target file is available in the environment variable @MK_TARGET@.
+--
+-- Strips off the last newline of the output to make it easier to use with shell commands.
 commandEvaluator :: MonadEvaluator m => Path Abs File -> Text -> Evaluator m
-commandEvaluator target (Text.unpack -> cmd) =
+commandEvaluator target cmd =
   Evaluator "Returns the standard output of a shell command" action
   where
     action = do
       (exitCode, out, err) <-
         liftIO $
         maskEnv "MK_TARGET" (toFilePath target) $
-        readCreateProcessWithExitCode (shell cmd) ""
+        readCreateProcessWithExitCode (shell $ Text.unpack cmd) ""
       case exitCode of
-        ExitSuccess -> return (Text.pack out)
-        _ -> throwError ("Error running shell command `" <> cmd <> "`: "
+        ExitSuccess -> return (Text.pack $ stripLastNewline out)
+        _ -> throwError ("Error running shell command " <> show cmd <> ":\n"
                          <> "exitCode = " <> show exitCode <> "\n\n"
-                         <> "Output on stdout: \n" <> out <> "\n\n"
-                         <> "Output on stderr: \n" <> err <> "\n")
+                         <> "Output on stdout:\n" <> out <> "\n\n"
+                         <> "Output on stderr:\n" <> err <> "\n")
 {-# INLINABLE commandEvaluator #-}
+
+
+stripLastNewline :: String -> String
+stripLastNewline [] = []
+stripLastNewline ['\n'] = []
+stripLastNewline (x:xs) = x : stripLastNewline xs
+{-# INLINABLE stripLastNewline #-}
+
 
 maskEnv :: String -> String -> IO a -> IO a
 maskEnv key tempValue action = do
