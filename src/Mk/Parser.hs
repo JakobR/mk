@@ -27,19 +27,28 @@ import Mk.Template
 
 type Parser = Parsec Void Text
 
-varP :: Parser Var
-varP = do
-  void $ single '%'
-  varName <- takeWhile1P (Just "alphanumeric character") isAlphaNum
-  void $ single '%'
-  return (Var varName)
+-- | Characters that are allowed in variable names
+isVarNameChar :: Char -> Bool
+isVarNameChar = isAlphaNum
+
+-- | Variable name (not surrounded by "%")
+varNameP :: Parser Var
+varNameP = Var <$> takeWhile1P (Just "alphanumeric character") isVarNameChar
 
 chunkP :: Parser Chunk
-chunkP = ChunkCursor <$ cursorP
-         <|> fmap ChunkVar varP
-         <|> fmap ChunkVerbatim verbatimP
+chunkP =
+  ChunkCursor <$ cursorP
+  <|> fmap ChunkVerbatim escapedP
+  -- Variable parser must be allowed to backtrack to support lone "%" (e.g., so TeX comments do not have to be escaped)
+  <|> try (fmap ChunkVar varP)
+  <|> fmap ChunkVerbatim verbatimP
+  -- Variable parser already failed at this point, so any remaining single "%" is allowed.
+  -- This is useful because it enables us to use TeX comments in templates without having to escape them.
+  <|> fmap ChunkVerbatim (chunk "%")
   where
     cursorP = chunk "%HERE%"
+    escapedP = "%" <$ chunk "%%"
+    varP = single '%' *> varNameP <* single '%'
     verbatimP = takeWhile1P Nothing (/= '%')
 
 templateP :: Parser Template
