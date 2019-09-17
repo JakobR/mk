@@ -1,12 +1,13 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -34,8 +35,6 @@ import qualified Data.Map.Strict as Map
 -- dhall
 import Dhall
 import qualified Dhall.Core as D
--- import qualified Dhall.Parser as D
--- import qualified Dhall.TypeCheck
 import qualified Dhall.Map as DMap
 
 -- filepath
@@ -130,19 +129,9 @@ instance Interpret VarValue where
         , ("Command", Just D.Text)
         ]
 
-      -- vvExtract :: D.Expr D.Src Dhall.TypeCheck.X -> Maybe VarValue
-      -- vvExtract (D.UnionLit "Const" v _) = VarConst <$> extract strictText v
-      -- vvExtract (D.UnionLit "Command" v _) = VarCommand <$> extract strictText v
       vvExtract (D.App (D.Field _ "Const") v) = VarConst <$> extract strictText v
       vvExtract (D.App (D.Field _ "Command") v) = VarCommand <$> extract strictText v
-      -- vvExtract (D.App (D.Field u fieldName) v) =
-      --   assert (u == vvExpected) $
-      --   case fieldName of
-      --     "Const" -> VarConst <$> extract strictText v
-      --     "Command" -> VarCommand <$> extract strictText v
-      --     _ -> Nothing
       vvExtract _ = Nothing
-      -- vvExtract e = error ("oh no: \n" ++ show e ++ "\nnormalized:\n" ++ show (D.normalize e :: D.Expr D.Src Dhall.TypeCheck.X))
 
 instance Interpret UnresolvedVarOverride
 instance Interpret UnresolvedConfigFile
@@ -157,8 +146,6 @@ configFileInterpretOptions =
 
     headToLower :: Text -> Text
     headToLower = over _head toLower
-    -- headToLower (Text.uncons -> Just (x,xs)) = Text.cons (toLower x) xs
-    -- headToLower xs = xs
 
 
 resolveConfig
@@ -314,12 +301,11 @@ optionsParserInfo defaultConfigFile =
         <> header "mk")
 
 
+-- | @~/.config/mk/mk.dhall@
 getDefaultConfigFile :: IO (Path Abs File)
 getDefaultConfigFile = do
-  configDirSuffix <- parseRelDir "mk"
-  configFilename <- parseRelFile "mk.dhall"
-  defaultConfigDir <- getXdgDir XdgConfig (Just configDirSuffix)
-  return (defaultConfigDir </> configFilename)
+  defaultConfigDir <- getXdgDir XdgConfig (Just [reldir|mk|])
+  return (defaultConfigDir </> [relfile|mk.dhall|])
 
 
 loadConfig :: IO Config
