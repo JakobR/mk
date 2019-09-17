@@ -36,18 +36,24 @@ import qualified Data.Text as Text
 import Mk.Evaluators.Types
 
 
-getRootName :: MonadError String m => Path b File -> m (Path Rel File)
+-- | Get root name of path, i.e., file name without directories and without file extension.
+--
+-- Returns 'Nothing' if the target filename consists only of an extension without proper filename (e.g., @.xyz@).
+getRootName :: MonadError String m => Path b File -> m (Maybe (Path Rel File))
 getRootName path =
   case setFileExtension "" (filename path) of
-    Left e -> throwError ("getRootName: " <> show e)
-    Right rootName -> pure rootName
+    Left e ->
+      if fileExtension path == toFilePath (filename path)
+      then pure Nothing
+      else throwError ("getRootName: " <> show e)
+    Right rootName -> pure (Just rootName)
 {-# INLINABLE getRootName #-}
 
 evalFILE :: MonadEvaluator m => EvaluatorInfo m
 evalFILE = mkEvalInfo (Var "FILE") description action
   where
     description = "File name, without extension."
-    action = asks ctxTarget >>= getRootName
+    action = asks ctxTarget >>= getRootName >>= maybe (pure "") toText
 {-# INLINABLE evalFILE #-}
 
 evalEXT :: MonadEvaluator m => EvaluatorInfo m

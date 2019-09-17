@@ -94,8 +94,10 @@ evalHASKELLMODULE = mkEvalInfo (Var "HASKELLMODULE") description action
       -- Algorithm: include all parent directories whose names start with an upper-case character.
       target <- asks ctxTarget
       targetRootName <- getRootName target
-      let components = moduleDirs (parent target)
-                       ++ [toFilePath targetRootName & _head %~ toUpper]
+      let
+        -- just use 'Main' as default module name if there's no proper root name
+        moduleName = maybe "Main" toFilePath targetRootName & _head %~ toUpper
+        components = moduleDirs (parent target) ++ [moduleName]
       return (intercalate "." components)
 
     moduleDirs :: Path Abs Dir -> [String]
