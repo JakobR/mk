@@ -34,10 +34,15 @@ import qualified Data.Map.Strict as Map
 -- dhall
 import Dhall
 import qualified Dhall.Core as D
+-- import qualified Dhall.Parser as D
+-- import qualified Dhall.TypeCheck
 import qualified Dhall.Map as DMap
 
 -- filepath
 import qualified System.FilePath as FilePath
+
+-- lens
+import Control.Lens (over, _head)
 
 -- optparse-applicative
 import Options.Applicative
@@ -121,13 +126,23 @@ instance Interpret VarValue where
                    }
     where
       vvExpected = D.Union . DMap.fromList $
-        [ ("Const", D.Text)
-        , ("Command", D.Text)
+        [ ("Const", Just D.Text)
+        , ("Command", Just D.Text)
         ]
 
-      vvExtract (D.UnionLit "Const" v _) = VarConst <$> extract strictText v
-      vvExtract (D.UnionLit "Command" v _) = VarCommand <$> extract strictText v
+      -- vvExtract :: D.Expr D.Src Dhall.TypeCheck.X -> Maybe VarValue
+      -- vvExtract (D.UnionLit "Const" v _) = VarConst <$> extract strictText v
+      -- vvExtract (D.UnionLit "Command" v _) = VarCommand <$> extract strictText v
+      vvExtract (D.App (D.Field _ "Const") v) = VarConst <$> extract strictText v
+      vvExtract (D.App (D.Field _ "Command") v) = VarCommand <$> extract strictText v
+      -- vvExtract (D.App (D.Field u fieldName) v) =
+      --   assert (u == vvExpected) $
+      --   case fieldName of
+      --     "Const" -> VarConst <$> extract strictText v
+      --     "Command" -> VarCommand <$> extract strictText v
+      --     _ -> Nothing
       vvExtract _ = Nothing
+      -- vvExtract e = error ("oh no: \n" ++ show e ++ "\nnormalized:\n" ++ show (D.normalize e :: D.Expr D.Src Dhall.TypeCheck.X))
 
 instance Interpret UnresolvedVarOverride
 instance Interpret UnresolvedConfigFile
@@ -141,8 +156,9 @@ configFileInterpretOptions =
     fieldPfxs = ["uvo", "ucfg"]
 
     headToLower :: Text -> Text
-    headToLower (Text.uncons -> Just (x,xs)) = Text.cons (toLower x) xs
-    headToLower xs = xs
+    headToLower = over _head toLower
+    -- headToLower (Text.uncons -> Just (x,xs)) = Text.cons (toLower x) xs
+    -- headToLower xs = xs
 
 
 resolveConfig
