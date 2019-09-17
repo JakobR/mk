@@ -10,7 +10,7 @@ maintainer:         git@jakobrath.eu
 copyright:          Copyright (C) 2019 Jakob Rath
 category:           Text
 build-type:         Simple
-extra-source-files: CHANGELOG.md
+extra-source-files: README.md
 
 common warnings
   ghc-options:      -Wall
