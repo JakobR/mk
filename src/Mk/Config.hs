@@ -167,7 +167,7 @@ resolveConfig UnresolvedConfigFile{..} UnresolvedOptions{..} = do
   let toPair x = (Var (uvoName x), uvoValue x)
       rawVarOverrides = toPair <$> ucfgVariableOverrides
 
-      repeatedElems = Map.keys . Map.filter (>1) . Map.fromList . map (, 1 :: Int)
+      repeatedElems = Map.keys . Map.filter (>1) . Map.fromListWith (+) . map (, 1 :: Int)
       repeatedVarNames =  repeatedElems $ map fst rawVarOverrides
       resolvedVarOverrides = Map.fromList rawVarOverrides
 
