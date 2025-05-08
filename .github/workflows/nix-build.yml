@@ -1,0 +1,22 @@
+# See:
+# - https://github.com/nix-community/nix-github-actions/blob/master/.github/workflows/cachix-install-nix-action.yml
+# - https://github.com/DeterminateSystems/nix-github-actions/blob/main/.github/workflows/nix.yml
+name: Build mk (Nix)
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: cachix/install-nix-action@v30
+
+    - name: Build mk
+      run: nix build .#mk
