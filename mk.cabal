@@ -42,6 +42,7 @@ executable mk
                   , Mk.Template
                   , Mk.Util.StaticAssert
   build-depends:    base >=4.12 && <5
+                  , bytestring
                   , containers
                   , dhall
                   , extra

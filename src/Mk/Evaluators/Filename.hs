@@ -15,6 +15,7 @@ module Mk.Evaluators.Filename
 -- base
 import Data.Char (isAlpha, isAlphaNum, toUpper)
 import Data.Function (on)
+import Data.Maybe (fromMaybe)
 
 -- lens
 import Control.Lens
@@ -43,7 +44,9 @@ getRootName :: MonadError String m => Path b File -> m (Maybe (Path Rel File))
 getRootName path =
   case setFileExtension "" (filename path) of
     Left e ->
-      if fileExtension path == toFilePath (filename path)
+      -- TODO: fix this function (the file extension test is probably wrong now)
+      -- TODO: at this point, it would be smart to add tests for all the evaluators
+      if fileExtension path == Just (toFilePath (filename path))
       then pure Nothing
       else throwError ("getRootName: " <> show e)
     Right rootName -> pure (Just rootName)
@@ -60,7 +63,7 @@ evalEXT :: MonadEvaluator m => EvaluatorInfo m
 evalEXT = mkEvalInfo (Var "EXT") description action
   where
     description = "File extension (component after the last dot)."
-    action = asks (tailSafe . fileExtension . ctxTarget)
+    action = asks (tailSafe . fromMaybe "" . fileExtension . ctxTarget)
     -- NOTE: fileExtension returns the extension including the dot (e.g., ".txt")
 {-# INLINABLE evalEXT #-}
 

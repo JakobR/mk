@@ -6,7 +6,7 @@ module Main
   ) where
 
 -- base
-import Control.Monad.IO.Class
+import Control.Monad (when, unless, msum, filterM)
 import Data.List (isPrefixOf)
 import System.Exit
 import System.IO

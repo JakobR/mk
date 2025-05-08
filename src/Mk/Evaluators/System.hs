@@ -12,11 +12,14 @@ module Mk.Evaluators.System
 import Control.Monad.IO.Class
 import Data.Char (isSpace)
 
+-- bytestring
+import qualified Data.ByteString.Char8 as B8
+
 -- hostname
 import Network.HostName (getHostName)
 
 -- unix
-import System.Posix.User (getRealUserID, UserEntry(..), getUserEntryForID)
+import System.Posix.User.ByteString (getRealUserID, UserEntry(..), getUserEntryForID)
 
 --mk
 import Mk.Evaluators.Types
@@ -36,6 +39,7 @@ evalUSER = mkEvalInfo (Var "USER") description action
     action = liftIO $ do
       uid <- getRealUserID
       UserEntry{..} <- getUserEntryForID uid
-      return (if not (isEmpty userGecos) then userGecos else userName)
-    isEmpty = all isSpace
+      let name_bs = if not (isEmpty userGecos) then userGecos else userName
+      return (B8.unpack name_bs)
+    isEmpty = all isSpace . B8.unpack
 {-# INLINABLE evalUSER #-}

@@ -26,6 +26,7 @@ import Data.Char (toLower)
 import Data.Foldable
 import Data.List (intercalate, isPrefixOf)
 import Data.Maybe
+import Data.String (fromString)
 import System.IO (hPutStrLn, stderr)
 
 -- containers
@@ -33,7 +34,10 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
 -- dhall
-import Dhall
+import Dhall (
+  FromDhall(autoWith), InterpretOptions(fieldModifier), Generic,
+  Decoder(Decoder, expected, extract), inputFile, strictText,
+  defaultInterpretOptions, extractError, genericAutoWith, defaultInputNormalizer)
 import qualified Dhall.Core as D
 import qualified Dhall.Map as DMap
 
@@ -54,6 +58,7 @@ import Path
 import Path.IO
 
 -- text
+import Data.Text (Text)
 import qualified Data.Text as Text
 
 -- mk
@@ -119,22 +124,25 @@ data UnresolvedConfigFile = UnresolvedConfigFile
   deriving Generic
 
 
-instance Interpret VarValue where
-  autoWith _ = Type{ expected = vvExpected
-                   , extract = vvExtract
-                   }
+instance FromDhall VarValue where
+  autoWith _ = Decoder{ expected = vvExpected
+                      , extract = vvExtract
+                      }
     where
-      vvExpected = D.Union . DMap.fromList $
+      vvExpected = pure $
+        D.Union . DMap.fromList $
         [ ("Const", Just D.Text)
         , ("Command", Just D.Text)
         ]
 
-      vvExtract (D.App (D.Field _ "Const") v) = VarConst <$> extract strictText v
-      vvExtract (D.App (D.Field _ "Command") v) = VarCommand <$> extract strictText v
-      vvExtract _ = Nothing
+      vvExtract (D.App (D.Field _ (D.FieldSelection _ "Const" _)) v) = VarConst <$> extract strictText v
+      vvExtract (D.App (D.Field _ (D.FieldSelection _ "Command" _)) v) = VarCommand <$> extract strictText v
+      vvExtract _ = extractError "unexpected expression for VarValue"
 
-instance Interpret UnresolvedVarOverride
-instance Interpret UnresolvedConfigFile
+instance FromDhall UnresolvedVarOverride
+
+instance FromDhall UnresolvedConfigFile where
+  autoWith _ = genericAutoWith configFileInterpretOptions
 
 
 configFileInterpretOptions :: InterpretOptions
@@ -149,7 +157,7 @@ configFileInterpretOptions =
 
 
 resolveConfig
-  :: MonadIO m
+  :: (MonadIO m, MonadFail m)
   => UnresolvedConfigFile
   -> UnresolvedOptions
   -> m Config
@@ -263,13 +271,13 @@ optionsParser defaultConfigFile =
     cursorPosHelp = Doc.vsep
       [ paragraph ("Control how the initial cursor position indicated in the template is "
                    ++ "printed to standard output.")
-      , Doc.text ("(values: " ++ cursorPosValues ++ ")")
+      , fromString ("(values: " ++ cursorPosValues ++ ")")
       ]
 
     cursorPosValues = intercalate ", " $ showCursorPos <$> [minBound..maxBound]
 
     paragraph :: String -> Doc.Doc
-    paragraph = foldr (Doc.</>) mempty . map Doc.string . words
+    paragraph = foldr (Doc.</>) mempty . map fromString . words
 
 
 readShowCursorPos_prop :: Bool
@@ -322,6 +330,6 @@ loadConfig = do
                       <> show resolvedConfigFile <> "...")
 
   unresolvedConfigFile <-
-    inputFile (autoWith configFileInterpretOptions) (toFilePath resolvedConfigFile)
+    inputFile (autoWith defaultInputNormalizer) (toFilePath resolvedConfigFile)
 
   resolveConfig unresolvedConfigFile unresolvedOptions
